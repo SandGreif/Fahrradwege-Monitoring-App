@@ -6,13 +6,20 @@
     android:layout_height="match_parent"
     tools:context="com.example.morro.fahrradwegemonitoringapp.MainActivity">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Hello World!"
-        app:layout_constraintBottom_toBottomOf="parent"
+    <ToggleButton
+        android:id="@+id/toggleButton"
+        style="@android:style/Widget.Button.Toggle"
+        android:layout_width="230dp"
+        android:layout_height="158dp"
+        android:layout_marginTop="64dp"
+        android:contextClickable="false"
+        android:text="ToggleButton"
+        android:textOff="@string/bildaufnahme_aus"
+        android:textOn="@string/bildaufnahme_an"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
 </android.support.constraint.ConstraintLayout>

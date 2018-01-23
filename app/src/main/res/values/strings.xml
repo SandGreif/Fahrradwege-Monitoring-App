@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Fahrradwege Monitoring App</string>
+    <string name="bildaufnahme_aus">Bildaufnahme aus</string>
+    <string name="bildaufnahme_an">Bildaufnahme an</string>
 </resources>
