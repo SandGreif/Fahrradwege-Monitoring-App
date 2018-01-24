@@ -1,5 +1,16 @@
 <resources>
     <string name="app_name">Fahrradwege Monitoring App</string>
-    <string name="bildaufnahme_aus">Bildaufnahme aus</string>
-    <string name="bildaufnahme_an">Bildaufnahme an</string>
+    <string name="button_start_bildaufnahme">Starte Bildaufnahme</string>
+    <string name="request_permission">This sample needs camera permission.</string>
+    <string name="camera_error">This device doesn\'t support Camera2 API.</string>
+    <string name="intro_message">
+        <![CDATA[
+
+
+            This sample demonstrates the basic use of Camera2 API. Check the source code to see how
+            you can display camera preview and take pictures.
+
+
+        ]]>
+    </string>
 </resources>
