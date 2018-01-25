@@ -353,7 +353,7 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
                 val largest = Collections.max(
                         Arrays.asList(*map.getOutputSizes(ImageFormat.JPEG)),
                         CompareSizesByArea())
-                imageReader = ImageReader.newInstance(largest.width, largest.height,
+                imageReader = ImageReader.newInstance(1280, 960,
                         ImageFormat.JPEG, /*maxImages*/ 2).apply {
                     setOnImageAvailableListener(onImageAvailableListener, backgroundHandler)
                 }
@@ -365,7 +365,7 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
                 sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION)
                 val swappedDimensions = areDimensionsSwapped(displayRotation)
 
-                val displaySize = Point()
+               val displaySize = Point()
                 activity.windowManager.defaultDisplay.getSize(displaySize)
                 val rotatedPreviewWidth = if (swappedDimensions) height else width
                 val rotatedPreviewHeight = if (swappedDimensions) width else height
@@ -725,13 +725,6 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
     }
 
 
-    private fun setAutoFlash(requestBuilder: CaptureRequest.Builder) {
-        if (flashSupported) {
-            requestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
-                    CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH)
-        }
-    }
-
     companion object {
 
         /**
@@ -780,12 +773,12 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
         /**
          * Max preview width that is guaranteed by Camera2 API
          */
-        private val MAX_PREVIEW_WIDTH = 600
+        private val MAX_PREVIEW_WIDTH = 1920
 
         /**
          * Max preview height that is guaranteed by Camera2 API
          */
-        private val MAX_PREVIEW_HEIGHT = 800
+        private val MAX_PREVIEW_HEIGHT = 1024
 
         /**
          * Given `choices` of `Size`s supported by a camera, choose the smallest one that
