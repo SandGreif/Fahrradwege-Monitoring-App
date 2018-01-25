@@ -12,12 +12,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * Quelle: Basic Camera2 example https://github.com/googlesamples/android-Camera2Basic/tree/master/kotlinApp
  */
 
 package com.example.morro.fahrradwegemonitoringapp
 
 import android.Manifest
-import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -36,9 +36,7 @@ import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
 import android.media.ImageReader
-import android.os.Bundle
-import android.os.Handler
-import android.os.HandlerThread
+import android.os.*
 import android.support.v4.app.ActivityCompat
 import android.support.v4.app.Fragment
 import android.support.v4.content.ContextCompat
@@ -52,8 +50,7 @@ import android.view.View
 import android.view.ViewGroup
 import com.example.android.camera2basic.*
 import java.io.File
-import java.util.Arrays
-import java.util.Collections
+import java.util.*
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlin.collections.ArrayList
@@ -85,6 +82,8 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
      * ID of the current [CameraDevice].
      */
     private lateinit var cameraId: String
+
+    private var actualTakingPictures : Boolean = false
 
     /**
      * An [AutoFitTextureView] for camera preview.
@@ -150,11 +149,15 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
      */
     private lateinit var file: File
 
+    private lateinit var letDirectory: File
+
     /**
      * This a callback object for the [ImageReader]. "onImageAvailable" will be called when a
      * still image is ready to be saved.
      */
     private val onImageAvailableListener = ImageReader.OnImageAvailableListener {
+        val milliseconds = Date().getTime()
+        file = File(letDirectory, ( "$milliseconds" + ".jpg"))
         backgroundHandler?.post(ImageSaver(it.acquireNextImage(), file))
     }
 
@@ -256,12 +259,30 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
     ): View? = inflater.inflate(R.layout.fragment_camera2_basic, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        view.findViewById<View>(R.id.picture).setOnClickListener(this)
+        view.findViewById<View>(R.id.pictureStop).setOnClickListener(this)
         textureView = view.findViewById(R.id.texture)
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        val c = Calendar.getInstance()
+        val year = c.get(Calendar.YEAR)
+        val month = c.get(Calendar.MONTH)
+        val day = c.get(Calendar.DAY_OF_MONTH)
         super.onActivityCreated(savedInstanceState)
-        file = File(activity.getExternalFilesDir(null), PIC_FILE_NAME)
+        if (ContextCompat.checkSelfPermission(activity,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(activity,
+                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                    1)
+            ActivityCompat.requestPermissions(activity,
+                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
+                    1)
+        }
+        letDirectory = File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_PICTURES), "$year" + "$month" + "$day")
+        letDirectory.mkdirs()
     }
 
     override fun onResume() {
@@ -519,7 +540,7 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
                                 previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
                                         CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
                                 // Flash is automatically enabled when necessary.
-                                setAutoFlash(previewRequestBuilder)
+                                //setAutoFlash(previewRequestBuilder)
 
                                 // Finally, we start displaying the camera preview.
                                 previewRequest = previewRequestBuilder.build()
@@ -636,15 +657,15 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
                 // Use the same AE and AF modes as the preview.
                 set(CaptureRequest.CONTROL_AF_MODE,
                         CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
-            }?.also { setAutoFlash(it) }
+            }//?.also { setAutoFlash(it) }
 
             val captureCallback = object : CameraCaptureSession.CaptureCallback() {
 
                 override fun onCaptureCompleted(session: CameraCaptureSession,
                         request: CaptureRequest,
                         result: TotalCaptureResult) {
-                    activity.showToast("Saved: $file")
-                    Log.d(TAG, file.toString())
+                    activity.showToast("Saved: $letDirectory")
+                    Log.d(TAG, letDirectory.toString())
                     unlockFocus()
                 }
             }
@@ -669,7 +690,7 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
             // Reset the auto-focus trigger
             previewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
                     CameraMetadata.CONTROL_AF_TRIGGER_CANCEL)
-            setAutoFlash(previewRequestBuilder)
+            //setAutoFlash(previewRequestBuilder)
             captureSession?.capture(previewRequestBuilder.build(), captureCallback,
                     backgroundHandler)
             // After this, the camera will go back to the normal state of preview.
@@ -679,14 +700,30 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
         } catch (e: CameraAccessException) {
             Log.e(TAG, e.toString())
         }
+        if(actualTakingPictures) {
+            lockFocus()
+        }
 
     }
 
     override fun onClick(view: View) {
         when (view.id) {
-          //  R.id.picture -> lockFocus() TODO stop aufnahme
+            R.id.pictureStop -> stopPictures()
+            R.id.picture -> takePictures()
         }
     }
+
+    private fun takePictures () {
+        if (!actualTakingPictures) {
+            actualTakingPictures = true
+            lockFocus()
+        }
+    }
+
+    private fun stopPictures () {
+            actualTakingPictures = false
+    }
+
 
     private fun setAutoFlash(requestBuilder: CaptureRequest.Builder) {
         if (flashSupported) {
@@ -743,12 +780,12 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
         /**
          * Max preview width that is guaranteed by Camera2 API
          */
-        private val MAX_PREVIEW_WIDTH = 1920
+        private val MAX_PREVIEW_WIDTH = 600
 
         /**
          * Max preview height that is guaranteed by Camera2 API
          */
-        private val MAX_PREVIEW_HEIGHT = 1080
+        private val MAX_PREVIEW_HEIGHT = 800
 
         /**
          * Given `choices` of `Size`s supported by a camera, choose the smallest one that

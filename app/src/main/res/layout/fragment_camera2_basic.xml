@@ -30,8 +30,30 @@
         android:layout_height="112dp"
         android:layout_alignParentBottom="true"
         android:layout_alignParentStart="true"
-        android:background="@color/control_background">
+        android:background="#008B8B" >
 
     </FrameLayout>
+
+    <Button
+        android:id="@+id/picture"
+        android:layout_width="200dp"
+        android:layout_height="100dp"
+        android:layout_above="@+id/pictureStop"
+        android:layout_centerHorizontal="true"
+        android:layout_gravity="center"
+        android:layout_marginBottom="19dp"
+        android:background="#7CFC00"
+        android:text="@string/picture" />
+
+    <Button
+        android:id="@+id/pictureStop"
+        android:layout_width="200dp"
+        android:layout_height="100dp"
+        android:layout_above="@+id/control"
+        android:layout_alignStart="@+id/picture"
+        android:layout_gravity="center"
+        android:layout_marginBottom="74dp"
+        android:background="#FF4500"
+        android:text="@string/pictureStop" />
 
 </RelativeLayout>
