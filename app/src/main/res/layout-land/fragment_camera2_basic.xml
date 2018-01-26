@@ -35,16 +35,29 @@
         android:layout_toRightOf="@id/texture"
         android:background="@color/control_background"
         android:orientation="horizontal">
+    </FrameLayout>
 
         <Button
             android:id="@+id/picture"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="150dp"
+            android:layout_height="100dp"
+            android:layout_alignParentStart="true"
+            android:layout_alignParentTop="true"
             android:layout_gravity="center"
+            android:layout_marginStart="28dp"
+            android:layout_marginTop="13dp"
+            android:background="#7CFC00"
             android:text="@string/picture" />
 
-
-
-    </FrameLayout>
+        <Button
+            android:id="@+id/pictureStop"
+            android:layout_width="150dp"
+            android:layout_height="100dp"
+            android:layout_alignTop="@+id/picture"
+            android:layout_gravity="center"
+            android:layout_marginStart="24dp"
+            android:layout_toEndOf="@+id/picture"
+            android:background="#FF4500"
+            android:text="@string/pictureStop" />
 
 </RelativeLayout>

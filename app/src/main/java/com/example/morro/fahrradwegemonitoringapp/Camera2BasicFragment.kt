@@ -35,6 +35,7 @@ import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
+import android.location.Location
 import android.media.ImageReader
 import android.os.*
 import android.support.v4.app.ActivityCompat
@@ -106,6 +107,11 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
     private lateinit var previewSize: Size
 
     /**
+     * Class for GPS Handling
+     */
+    private lateinit var gpsLocation: GPSLocation
+
+    /**
      * [CameraDevice.StateCallback] is called when [CameraDevice] changes its state.
      */
     private val stateCallback = object : CameraDevice.StateCallback() {
@@ -152,13 +158,25 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
     private lateinit var letDirectory: File
 
     /**
+     * File to write GPS ccordinates
+     */
+    private lateinit var fileLocation: File
+
+    /**
      * This a callback object for the [ImageReader]. "onImageAvailable" will be called when a
      * still image is ready to be saved.
      */
     private val onImageAvailableListener = ImageReader.OnImageAvailableListener {
+        val image = it.acquireLatestImage()
         val milliseconds = Date().getTime()
+        var location = gpsLocation.getLocation()
+
         file = File(letDirectory, ( "$milliseconds" + ".jpg"))
-        backgroundHandler?.post(ImageSaver(it.acquireNextImage(), file))
+        if(image != null) {
+            backgroundHandler?.post(ImageSaver(image, file))
+            if (location != null)
+                fileLocation.appendText("${milliseconds} ${location.latitude} ${location.longitude}\n")
+        }
     }
 
     /**
@@ -269,6 +287,8 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
         val year = c.get(Calendar.YEAR)
         val month = c.get(Calendar.MONTH)
         val day = c.get(Calendar.DAY_OF_MONTH)
+        gpsLocation = GPSLocation(activity)
+        gpsLocation.init()
         super.onActivityCreated(savedInstanceState)
         if (ContextCompat.checkSelfPermission(activity,
                         Manifest.permission.WRITE_EXTERNAL_STORAGE)
@@ -283,6 +303,7 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
         letDirectory = File(Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_PICTURES), "$year" + "$month" + "$day")
         letDirectory.mkdirs()
+        fileLocation = File(letDirectory, ( "coordinates.csv"))
     }
 
     override fun onResume() {
@@ -354,7 +375,7 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
                         Arrays.asList(*map.getOutputSizes(ImageFormat.JPEG)),
                         CompareSizesByArea())
                 imageReader = ImageReader.newInstance(1280, 960,
-                        ImageFormat.JPEG, /*maxImages*/ 2).apply {
+                        ImageFormat.JPEG, /*maxImages*/ 20).apply {
                     setOnImageAvailableListener(onImageAvailableListener, backgroundHandler)
                 }
 
