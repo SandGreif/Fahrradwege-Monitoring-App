@@ -7,19 +7,14 @@ import android.view.View
 
 class MainActivity : AppCompatActivity() {
 
-    var savedInstanceStateV: Bundle? = null
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_camera)
-        savedInstanceStateV = savedInstanceState
+        savedInstanceState ?: supportFragmentManager.beginTransaction()
+                .replace(R.id.container, Camera2BasicFragment.newInstance())
+                .commit()
     }
 
-    fun startBildaufnahme(view: View){
 
-        savedInstanceStateV ?: supportFragmentManager.beginTransaction()
-                 .replace(R.id.container, Camera2BasicFragment.newInstance())
-                 .commit()
-    }
 
 }

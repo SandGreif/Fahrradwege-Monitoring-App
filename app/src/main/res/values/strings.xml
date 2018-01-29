@@ -1,6 +1,5 @@
 <resources>
     <string name="app_name">Fahrradwege Monitoring App</string>
-    <string name="button_oeffne_bildaufnahme">Öffne Bildaufnahme</string>
     <string name="picture">Starte Bildaufnahme</string>
     <string name="pictureStop">Stoppe Bildaufnahme</string>
     <string name="request_permission">This sample needs camera permission.</string>

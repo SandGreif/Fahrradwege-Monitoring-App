@@ -732,12 +732,16 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
                 override fun onCaptureCompleted(session: CameraCaptureSession,
                         request: CaptureRequest,
                         result: TotalCaptureResult) {
-                    var captureCompleteTime = lastSavedPictureTime - startTime
-                    var captureCompleteTimeString = "Speicherzeitpunkt: " + "$captureCompleteTime" + "ms \n " +
-                            "Aufgenommene Bilder: $imageCounter"
-                    activity.showToast(captureCompleteTimeString)
-                    Log.d(TAG, captureCompleteTimeString.toString())
-                    unlockFocus()
+                    if(imageCounter > 0) {
+                        var captureCompleteTimeMs = lastSavedPictureTime - startTime
+                        var captureTimeMinutes = captureCompleteTimeMs / (60*60)
+                        var captureCompleteTimeString = "Speicherzeitpunkt: " + "$captureCompleteTimeMs" + "ms \n " +
+                                "In Minuten: $captureTimeMinutes \n" +
+                                "Aufgenommene Bilder: $imageCounter"
+                        activity.showToast(captureCompleteTimeString)
+                        Log.d(TAG, captureCompleteTimeString.toString())
+                        unlockFocus()
+                    }
                 }
             }
 
