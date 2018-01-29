@@ -39,7 +39,6 @@ import android.location.Location
 import android.media.Image
 import android.media.ImageReader
 import android.os.*
-import android.provider.ContactsContract
 import android.support.v4.app.ActivityCompat
 import android.support.v4.app.Fragment
 import android.support.v4.content.ContextCompat
@@ -51,9 +50,12 @@ import android.view.Surface
 import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
+import android.widget.ToggleButton
 import com.example.android.camera2basic.*
 import java.io.File
 import java.util.*
+import java.util.Collections.max
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlin.collections.ArrayList
@@ -87,6 +89,16 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
     private lateinit var cameraId: String
 
     private var actualTakingPictures : Boolean = false
+
+    /**
+     * To display the actual speed
+     */
+    private lateinit var speedTxt : TextView
+
+    /**
+     * To display the actual
+     */
+    private lateinit var imageCapturedTxt : TextView
 
     /**
      * Number of saved images
@@ -131,6 +143,9 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
 
     private  var lastSavedPictureTime: Long = 0
 
+    /**
+     * Speed
+     */
     private var speed: Float = 0.0f
 
     /**
@@ -210,9 +225,9 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
         val image = it.acquireLatestImage()
         lastSavedPictureTime = time.getTime()
         var location = gpsLocation.getLocation()
-        speed = location.getSpeed()
         if(image != null) {
             if(location != null) {
+                speed = location.getSpeed()
                 if(imageCounter % (2000 * directoriesCounter) == 0) {
                         newFolder()
                 }
@@ -365,9 +380,17 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
     ): View? = inflater.inflate(R.layout.fragment_camera2_basic, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        view.findViewById<View>(R.id.picture).setOnClickListener(this)
-        view.findViewById<View>(R.id.pictureStop).setOnClickListener(this)
         textureView = view.findViewById(R.id.texture)
+        speedTxt = view.findViewById(R.id.speedTxt) as TextView
+        imageCapturedTxt = view.findViewById(R.id.imageCaptured) as TextView
+        val toggleButton = view.findViewById(R.id.toggleButtonStart) as ToggleButton
+        toggleButton?.setOnCheckedChangeListener { buttonView, isChecked ->
+            if (isChecked) {
+                takePictures()
+            } else {
+                stopPictures()
+            }
+        }
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
@@ -466,7 +489,7 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
                         CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: continue
 
                 // For still image captures, we use the largest available size.
-                val largest = Collections.max(
+                val largest = max(
                         Arrays.asList(*map.getOutputSizes(ImageFormat.JPEG)),
                         CompareSizesByArea())
                 imageReader = ImageReader.newInstance(captureHeight, captureWidth,
@@ -782,13 +805,17 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
                         result: TotalCaptureResult) {
                     if(imageCounter > 0) {
                         var captureCompleteTimeMs = lastSavedPictureTime - startTime
-                        var captureTimeMinutes = captureCompleteTimeMs / (60*60)
+                        var captureTimeMinutes = (captureCompleteTimeMs / 1000) / 60
                         var captureCompleteTimeString =
                                 "Speicherzeitpunkt: " + "$captureCompleteTimeMs" + "ms \n" +
-                                "In Minuten: $captureTimeMinutes \n" +
-                                "Geschwindigkeit: $speed " + "m/s\n" +
-                                "Aufgenommene Bilder: $imageCounter"
-                        activity.showToast(captureCompleteTimeString)
+                                        "In Minuten: $captureTimeMinutes \n" +
+                                        "Aufgenommene Bilder: $imageCounter"
+                        getActivity().runOnUiThread(Runnable    {
+                        run() {
+                            speedTxt.setText("${speed}m/s")
+                            imageCapturedTxt.setText( captureCompleteTimeString)
+                        }
+                       })
                         Log.d(TAG, captureCompleteTimeString.toString())
                         unlockFocus()
                     }
@@ -827,13 +854,6 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
         }
     }
 
-    override fun onClick(view: View) {
-        when (view.id) {
-            R.id.pictureStop -> stopPictures()
-            R.id.picture -> takePictures()
-        }
-    }
-
     private fun takePictures () {
         if (!actualTakingPictures) {
             actualTakingPictures = true
@@ -845,6 +865,9 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
             actualTakingPictures = false
     }
 
+    override fun onClick(v: View?) {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
 
     companion object {
 
@@ -948,7 +971,7 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
             if (bigEnough.size > 0) {
                 return Collections.min(bigEnough, CompareSizesByArea())
             } else if (notBigEnough.size > 0) {
-                return Collections.max(notBigEnough, CompareSizesByArea())
+                return max(notBigEnough, CompareSizesByArea())
             } else {
                 Log.e(TAG, "Couldn't find any suitable preview size")
                 return choices[0]

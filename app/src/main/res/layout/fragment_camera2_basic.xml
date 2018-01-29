@@ -34,28 +34,42 @@
 
     </FrameLayout>
 
-    <Button
-        android:id="@+id/pictureStop"
-        android:layout_width="110dp"
-        android:layout_height="60dp"
-        android:layout_alignParentEnd="true"
-        android:layout_alignTop="@+id/picture"
-        android:layout_gravity="center"
-        android:layout_marginEnd="46dp"
-        android:layout_marginTop="18dp"
-        android:background="#FF4500"
-        android:text="@string/pictureStop" />
-
-    <Button
-        android:id="@+id/picture"
+    <ToggleButton
+        android:id="@+id/toggleButtonStart"
+        style="@android:style/Widget.Button.Toggle"
         android:layout_width="150dp"
         android:layout_height="90dp"
         android:layout_alignTop="@+id/control"
+        android:layout_centerHorizontal="true"
         android:layout_gravity="center"
-        android:layout_marginEnd="38dp"
         android:layout_marginTop="11dp"
-        android:layout_toStartOf="@+id/pictureStop"
-        android:background="#7CFC00"
-        android:text="@string/picture" />
+        android:checked="false"
+        android:textOff="Starte Datenerfassung"
+        android:textOn="Stoppe Datenerfassung" />
+
+    <TextView
+        android:id="@+id/speedTxt"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/control"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="20dp"
+        android:fontFamily="cursive"
+        android:text="             "
+        android:textColor="?android:attr/colorBackground"
+        android:textSize="46sp"
+        android:textStyle="bold|italic" />
+
+    <TextView
+        android:id="@+id/imageCaptured"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_alignStart="@+id/speedTxt"
+        android:layout_marginStart="25dp"
+        android:layout_marginTop="41dp"
+        android:text="            "
+        android:textColor="@android:color/background_light"
+        android:textSize="14sp" />
 
 </RelativeLayout>
