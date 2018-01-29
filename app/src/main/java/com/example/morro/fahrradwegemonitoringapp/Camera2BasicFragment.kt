@@ -88,7 +88,15 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
 
     private var actualTakingPictures : Boolean = false
 
+    /**
+     * Number of saved images
+     */
     private var imageCounter : Int = 0
+
+    /**
+     * Number of directories
+     */
+    private var directoriesCounter : Int = 1
 
     private val captureHeight: Int = 1280
 
@@ -122,6 +130,13 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
     private  var startTime: Long = 0
 
     private  var lastSavedPictureTime: Long = 0
+
+    private var speed: Float = 0.0f
+
+    /**
+     * Time relatet class object
+     */
+    private lateinit var time: Time
 
     /**
      * [CameraDevice.StateCallback] is called when [CameraDevice] changes its state.
@@ -167,13 +182,24 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
      */
     private lateinit var file: File
 
+    /**
+     * root directory path
+     */
     private lateinit var letDirectory: File
+
+    /**
+     * actual directory path
+     */
+    private lateinit var actualDirectory: File
 
     /**
      * File to write GPS ccordinates
      */
     private lateinit var fileLocation: File
 
+    /**
+     * Object to save images
+     */
     private lateinit var imageSaver: ImageSaver
 
     /**
@@ -182,10 +208,14 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
      */
     private val onImageAvailableListener = ImageReader.OnImageAvailableListener {
         val image = it.acquireLatestImage()
-        lastSavedPictureTime = Date().getTime()
+        lastSavedPictureTime = time.getTime()
         var location = gpsLocation.getLocation()
+        speed = location.getSpeed()
         if(image != null) {
             if(location != null) {
+                if(imageCounter % (2000 * directoriesCounter) == 0) {
+                        newFolder()
+                }
                 saveImage(image)
                 saveFeatures(location)
             } else {
@@ -200,7 +230,7 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
      * Post.: Image is saved
      */
     private fun saveImage(image: Image) {
-            file = File(letDirectory, ( "$lastSavedPictureTime" + ".jpg"))
+            file = File(actualDirectory, ( "$lastSavedPictureTime" + ".jpg"))
             imageSaver.saveImage(image, file)
             imageCounter++
     }
@@ -211,7 +241,7 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
      * Postc.: Features are saved to a File
      */
     private fun saveFeatures(location : Location) {
-            fileLocation.appendText("${lastSavedPictureTime},${location.latitude},${location.longitude}\n")
+            fileLocation.appendText("${lastSavedPictureTime},${location.latitude},${location.longitude},${speed}\n")
     }
 
     /**
@@ -221,6 +251,18 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
     private fun requestNextImage() {
         if(actualTakingPictures) {
             lockFocus()
+        }
+    }
+
+    /**
+     * Postc.: New Directory
+     */
+    private fun newFolder() {
+        actualDirectory = File(letDirectory, "$directoriesCounter")
+        actualDirectory.mkdir()
+        fileLocation = File(actualDirectory, ("coordinates.csv"))
+        if(imageCounter>1) {
+            directoriesCounter++
         }
     }
 
@@ -255,6 +297,7 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
      * Orientation of the camera sensor
      */
     private var sensorOrientation = 0
+
 
     /**
      * A [CameraCaptureSession.CaptureCallback] that handles events related to JPEG capture.
@@ -328,15 +371,24 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        val c = Calendar.getInstance()
-        val year = c.get(Calendar.YEAR)
-        val month = c.get(Calendar.MONTH)
-        val day = c.get(Calendar.DAY_OF_MONTH)
+        super.onActivityCreated(savedInstanceState)
+        askForPermissionsExternalStorage()
+        time = Time()
         imageSaver = ImageSaver()
         gpsLocation = GPSLocation(activity)
-        startTime = Date().getTime()
+        startTime = time.getTime()
         gpsLocation.init()
-        super.onActivityCreated(savedInstanceState)
+        letDirectory = File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_PICTURES), time.getDay())
+        if(!letDirectory.mkdirs())
+            closeCamera()
+    }
+
+    /**
+     * Prec.: /
+     * Postc.: Reand and write permission to external storage granted
+     */
+    private fun askForPermissionsExternalStorage() {
         if (ContextCompat.checkSelfPermission(activity,
                         Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -347,10 +399,6 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
                     arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
                     1)
         }
-        letDirectory = File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_PICTURES), "$year" + "$month" + "$day")
-        letDirectory.mkdirs()
-        fileLocation = File(letDirectory, ( "coordinates.csv"))
     }
 
     override fun onResume() {
@@ -735,8 +783,10 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
                     if(imageCounter > 0) {
                         var captureCompleteTimeMs = lastSavedPictureTime - startTime
                         var captureTimeMinutes = captureCompleteTimeMs / (60*60)
-                        var captureCompleteTimeString = "Speicherzeitpunkt: " + "$captureCompleteTimeMs" + "ms \n " +
+                        var captureCompleteTimeString =
+                                "Speicherzeitpunkt: " + "$captureCompleteTimeMs" + "ms \n" +
                                 "In Minuten: $captureTimeMinutes \n" +
+                                "Geschwindigkeit: $speed " + "m/s\n" +
                                 "Aufgenommene Bilder: $imageCounter"
                         activity.showToast(captureCompleteTimeString)
                         Log.d(TAG, captureCompleteTimeString.toString())

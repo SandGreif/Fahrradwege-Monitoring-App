@@ -10,6 +10,7 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.widget.Toast;
 
 import java.io.File;
 
@@ -46,7 +47,7 @@ public class GPSLocation {
         LocationListener locationListener = new LocationListener() {
             public void onLocationChanged(Location location) {
                 // Called when a new location is found by the network location provider.
-                locationExemplar = location;
+                 locationExemplar = location;
             }
             public void onStatusChanged(String provider, int status, Bundle extras) {
             }
