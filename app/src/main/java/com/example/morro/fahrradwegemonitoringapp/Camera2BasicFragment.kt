@@ -36,6 +36,7 @@ import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
 import android.location.Location
+import android.media.Image
 import android.media.ImageReader
 import android.os.*
 import android.provider.ContactsContract
@@ -183,13 +184,41 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
         val image = it.acquireLatestImage()
         lastSavedPictureTime = Date().getTime()
         var location = gpsLocation.getLocation()
-        file = File(letDirectory, ( "$lastSavedPictureTime" + ".jpg"))
         if(image != null) {
-            imageCounter++
-            imageSaver.saveImage(image, file)
-            if (location != null)
-                fileLocation.appendText("${lastSavedPictureTime},${location.latitude},${location.longitude}\n")
+            if(location != null) {
+                saveImage(image)
+                saveFeatures(location)
+            } else {
+                image.close()
+            }
         }
+        requestNextImage()
+    }
+
+    /**
+     * Prec.: Image != null
+     * Post.: Image is saved
+     */
+    private fun saveImage(image: Image) {
+            file = File(letDirectory, ( "$lastSavedPictureTime" + ".jpg"))
+            imageSaver.saveImage(image, file)
+            imageCounter++
+    }
+
+    /**
+     * Save Features: Time in ms/ GPS /
+     * Prec.: Location != null
+     * Postc.: Features are saved to a File
+     */
+    private fun saveFeatures(location : Location) {
+            fileLocation.appendText("${lastSavedPictureTime},${location.latitude},${location.longitude}\n")
+    }
+
+    /**
+     * Prec.: - All imgages from ImageReader are acquired
+     * Postc.: Call method lockFocus if actualTakingPictures is true
+     */
+    private fun requestNextImage() {
         if(actualTakingPictures) {
             lockFocus()
         }
