@@ -38,9 +38,6 @@ public class GPSLocation {
                         new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                         1);
 
-                // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
-                // app-defined int constant. The callback method gets the
-                // result of the request.
         }
         // Acquire a reference to the system Location Manager
         LocationManager locationManager = (LocationManager) activity.getSystemService(Context.LOCATION_SERVICE);

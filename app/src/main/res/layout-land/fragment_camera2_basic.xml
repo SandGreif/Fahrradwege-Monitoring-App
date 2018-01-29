@@ -33,7 +33,7 @@
         android:layout_alignParentEnd="true"
         android:layout_alignParentTop="true"
         android:layout_toRightOf="@id/texture"
-        android:background="@color/control_background"
+        android:background="#008B8B"
         android:orientation="horizontal">
     </FrameLayout>
 

@@ -38,6 +38,7 @@ import android.hardware.camera2.TotalCaptureResult
 import android.location.Location
 import android.media.ImageReader
 import android.os.*
+import android.provider.ContactsContract
 import android.support.v4.app.ActivityCompat
 import android.support.v4.app.Fragment
 import android.support.v4.content.ContextCompat
@@ -86,6 +87,12 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
 
     private var actualTakingPictures : Boolean = false
 
+    private var imageCounter : Int = 0
+
+    private val captureHeight: Int = 1280
+
+    private val captureWidth: Int = 960
+
     /**
      * An [AutoFitTextureView] for camera preview.
      */
@@ -110,6 +117,10 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
      * Class for GPS Handling
      */
     private lateinit var gpsLocation: GPSLocation
+
+    private  var startTime: Long = 0
+
+    private  var lastSavedPictureTime: Long = 0
 
     /**
      * [CameraDevice.StateCallback] is called when [CameraDevice] changes its state.
@@ -162,20 +173,25 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
      */
     private lateinit var fileLocation: File
 
+    private lateinit var imageSaver: ImageSaver
+
     /**
      * This a callback object for the [ImageReader]. "onImageAvailable" will be called when a
      * still image is ready to be saved.
      */
     private val onImageAvailableListener = ImageReader.OnImageAvailableListener {
         val image = it.acquireLatestImage()
-        val milliseconds = Date().getTime()
+        lastSavedPictureTime = Date().getTime()
         var location = gpsLocation.getLocation()
-
-        file = File(letDirectory, ( "$milliseconds" + ".jpg"))
+        file = File(letDirectory, ( "$lastSavedPictureTime" + ".jpg"))
         if(image != null) {
-            backgroundHandler?.post(ImageSaver(image, file))
+            imageCounter++
+            imageSaver.saveImage(image, file)
             if (location != null)
-                fileLocation.appendText("${milliseconds} ${location.latitude} ${location.longitude}\n")
+                fileLocation.appendText("${lastSavedPictureTime},${location.latitude},${location.longitude}\n")
+        }
+        if(actualTakingPictures) {
+            lockFocus()
         }
     }
 
@@ -287,7 +303,9 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
         val year = c.get(Calendar.YEAR)
         val month = c.get(Calendar.MONTH)
         val day = c.get(Calendar.DAY_OF_MONTH)
+        imageSaver = ImageSaver()
         gpsLocation = GPSLocation(activity)
+        startTime = Date().getTime()
         gpsLocation.init()
         super.onActivityCreated(savedInstanceState)
         if (ContextCompat.checkSelfPermission(activity,
@@ -374,7 +392,7 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
                 val largest = Collections.max(
                         Arrays.asList(*map.getOutputSizes(ImageFormat.JPEG)),
                         CompareSizesByArea())
-                imageReader = ImageReader.newInstance(1280, 960,
+                imageReader = ImageReader.newInstance(captureHeight, captureWidth,
                         ImageFormat.JPEG, /*maxImages*/ 20).apply {
                     setOnImageAvailableListener(onImageAvailableListener, backgroundHandler)
                 }
@@ -685,8 +703,11 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
                 override fun onCaptureCompleted(session: CameraCaptureSession,
                         request: CaptureRequest,
                         result: TotalCaptureResult) {
-                    activity.showToast("Saved: $letDirectory")
-                    Log.d(TAG, letDirectory.toString())
+                    var captureCompleteTime = lastSavedPictureTime - startTime
+                    var captureCompleteTimeString = "Speicherzeitpunkt: " + "$captureCompleteTime" + "ms \n " +
+                            "Aufgenommene Bilder: $imageCounter"
+                    activity.showToast(captureCompleteTimeString)
+                    Log.d(TAG, captureCompleteTimeString.toString())
                     unlockFocus()
                 }
             }
@@ -721,10 +742,6 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
         } catch (e: CameraAccessException) {
             Log.e(TAG, e.toString())
         }
-        if(actualTakingPictures) {
-            lockFocus()
-        }
-
     }
 
     override fun onClick(view: View) {

@@ -48,12 +48,13 @@
 
     <Button
         android:id="@+id/pictureStop"
-        android:layout_width="150dp"
-        android:layout_height="100dp"
+        android:layout_width="110dp"
+        android:layout_height="60dp"
+        android:layout_alignParentEnd="true"
         android:layout_alignTop="@+id/picture"
         android:layout_gravity="center"
-        android:layout_marginStart="24dp"
-        android:layout_toEndOf="@+id/picture"
+        android:layout_marginEnd="46dp"
+        android:layout_marginTop="18dp"
         android:background="#FF4500"
         android:text="@string/pictureStop" />
 

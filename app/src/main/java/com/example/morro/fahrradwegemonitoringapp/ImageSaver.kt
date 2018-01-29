@@ -11,19 +11,11 @@ import java.nio.ByteBuffer
 /**
  * Saves a JPEG [Image] into the specified [File].
  */
-internal class ImageSaver(
-        /**
-         * The JPEG image
-         */
-        private val image: Image,
+class ImageSaver {
 
-        /**
-         * The file we save the image into.
-         */
-        private val file: File
-) : Runnable {
+    private val TAG = "ImageSaver"
 
-    override fun run() {
+    public fun saveImage(image: Image, file: File) {
         val buffer = image.planes[0].buffer
         val bytes = ByteArray(buffer.remaining())
         buffer.get(bytes)
@@ -45,11 +37,6 @@ internal class ImageSaver(
             }
         }
     }
-
-    companion object {
-        /**
-         * Tag for the [Log].
-         */
-        private val TAG = "ImageSaver"
-    }
 }
+
+
