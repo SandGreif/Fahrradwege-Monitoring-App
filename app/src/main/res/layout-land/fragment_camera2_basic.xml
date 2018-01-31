@@ -60,7 +60,7 @@
         android:fontFamily="cursive"
         android:text="             "
         android:textColor="?android:attr/colorBackground"
-        android:textSize="46sp"
+        android:textSize="24sp"
         android:textStyle="bold|italic" />
 
     <TextView

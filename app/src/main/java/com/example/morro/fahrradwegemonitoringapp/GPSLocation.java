@@ -29,8 +29,7 @@ public class GPSLocation {
     }
 
     public void init() {
-
-        // Here, thisActivity is the current activity
+        Logger.INSTANCE.writeToLogger("");
         if (ContextCompat.checkSelfPermission(activity,
                 Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -40,25 +39,34 @@ public class GPSLocation {
                         1);
 
         }
-        // Acquire a reference to the system Location Manager
-        LocationManager locationManager = (LocationManager) activity.getSystemService(Context.LOCATION_SERVICE);
 
-        // Define a listener that responds to location updates
+        LocationManager locationManager = (LocationManager) activity.getSystemService(Context.LOCATION_SERVICE);
+        final int duration = Toast.LENGTH_LONG;
+
+        // Definiert ein listener der auf Lokations Update reagiert
         LocationListener locationListener = new LocationListener() {
             public void onLocationChanged(Location location) {
-                // Called when a new location is found by the network location provider.
+                // Wird aufgerufen wenn eine neue Lokation gefunden wurde von den Lokations Provider
                  locationExemplar = location;
             }
             public void onStatusChanged(String provider, int status, Bundle extras) {
+                Toast.makeText(activity, "LocationListener: methode: onStatusChanged: status: " + status, duration).show();
+                Logger.INSTANCE.writeToLogger("LocationListener: methode: onStatusChanged: status: " + status);
+                init();
             }
             public void onProviderEnabled(String provider) {
+                Toast.makeText(activity, "LocationListener: methode: onProviderEnabled: provider: " + provider, duration).show();
+                Logger.INSTANCE.writeToLogger("LocationListener: methode: onProviderEnabled: provider: " + provider);
             }
             public void onProviderDisabled(String provider) {
+                Toast.makeText(activity, "LocationListener: methode: onProviderDisabled: provider: " + provider, duration).show();
+                Logger.INSTANCE.writeToLogger("LocationListener: methode: onProviderEnabled: provider: " + provider);
+                init();
             }
             };
 
-        // Register the listener with the Location Manager to receive location updates
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,0,0,locationListener);
+        // Registriert den listener mit den Location Manager um Lokations Updates zu erhalten
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,100,2,locationListener);
     }
 
     public Location getLocation() {

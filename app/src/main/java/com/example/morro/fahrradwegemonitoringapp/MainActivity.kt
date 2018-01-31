@@ -11,7 +11,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_camera)
         savedInstanceState ?: supportFragmentManager.beginTransaction()
-                .replace(R.id.container, Camera2BasicFragment.newInstance())
+                .replace(R.id.container, CameraFragment.newInstance())
                 .commit()
     }
 
