@@ -106,6 +106,11 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
     private var imageCounter : Int = 0
 
     /**
+     * Number of saved images last time called onCaptureCompleted method
+     */
+    private var lastImageCounter : Int = 0
+
+    /**
      * Number of directories
      */
     private var directoriesCounter : Int = 1
@@ -144,9 +149,24 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
     private  var lastSavedPictureTime: Long = 0
 
     /**
-     * Speed
+     * actual speed  in km/h
      */
     private var speed: Float = 0.0f
+
+    /**
+     * last speed measured related to the last captured image in km/h
+     */
+    private var speedLast: Float = 0.0f
+
+    /**
+     * Last GPS location
+     */
+    private lateinit var locationLast: Location
+
+    /**
+     * Speed in km/h betwenn two captured images
+     */
+    private var speedBetweenCaptures: Float = 0.0f
 
     /**
      * Time relatet class object
@@ -217,6 +237,7 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
      */
     private lateinit var imageSaver: ImageSaver
 
+
     /**
      * This a callback object for the [ImageReader]. "onImageAvailable" will be called when a
      * still image is ready to be saved.
@@ -225,19 +246,24 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
         val image = it.acquireLatestImage()
         lastSavedPictureTime = time.getTime()
         var location = gpsLocation.getLocation()
-        if(image != null) {
-            if(location != null) {
-                speed = location.getSpeed()
-                if(imageCounter % (2000 * directoriesCounter) == 0) {
+        if (image != null) {
+            if (location != null) {
+                speed = (location.getSpeed() * 60 * 60) / 1000 // in km/h
+                if (((speed - 4.0f) > 0.0001)) {  // is speed existing
+                    speedBetweenCaptures = (speedLast + speed) / 2
+                    if (imageCounter % (2000 * directoriesCounter) == 0) {
                         newFolder()
-                }
-                saveImage(image)
-                saveFeatures(location)
+                    }
+                    saveFeatures(location)
+                    saveImage(image)
+                    speedLast = speed
+                } else {
+                   image.close()
+               }
             } else {
                 image.close()
             }
         }
-        requestNextImage()
     }
 
     /**
@@ -252,11 +278,17 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
 
     /**
      * Save Features: Time in ms/ GPS /
-     * Prec.: Location != null
-     * Postc.: Features are saved to a File
+     * Prec.: Location != null must calle before saveImage methode
+     * Postc.: Features are saved to a File and locationLast hold location info
      */
     private fun saveFeatures(location : Location) {
-            fileLocation.appendText("${lastSavedPictureTime},${location.latitude},${location.longitude},${speed}\n")
+            if(imageCounter == 0) {
+                locationLast = location;
+            }
+            var latitudeAverage = (location.latitude + locationLast.latitude) / 2
+            var longitudeAverage = (location.latitude + locationLast.latitude) / 2
+             fileLocation.appendText("${lastSavedPictureTime},${latitudeAverage.toFloat()},${longitudeAverage.toFloat()},${speedBetweenCaptures}\n")
+            locationLast = location;
     }
 
     /**
@@ -273,12 +305,12 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
      * Postc.: New Directory
      */
     private fun newFolder() {
-        actualDirectory = File(letDirectory, "$directoriesCounter")
-        actualDirectory.mkdir()
-        fileLocation = File(actualDirectory, ("coordinates.csv"))
         if(imageCounter>1) {
             directoriesCounter++
         }
+        actualDirectory = File(letDirectory, "$directoriesCounter")
+        actualDirectory.mkdir()
+        fileLocation = File(actualDirectory, ("features.csv"))
     }
 
     /**
@@ -803,22 +835,24 @@ class Camera2BasicFragment : Fragment(), View.OnClickListener,
                 override fun onCaptureCompleted(session: CameraCaptureSession,
                         request: CaptureRequest,
                         result: TotalCaptureResult) {
-                    if(imageCounter > 0) {
                         var captureCompleteTimeMs = lastSavedPictureTime - startTime
                         var captureTimeMinutes = (captureCompleteTimeMs / 1000) / 60
                         var captureCompleteTimeString =
                                 "Speicherzeitpunkt: " + "$captureCompleteTimeMs" + "ms \n" +
                                         "In Minuten: $captureTimeMinutes \n" +
                                         "Aufgenommene Bilder: $imageCounter"
-                        getActivity().runOnUiThread(Runnable    {
-                        run() {
-                            speedTxt.setText("${speed}m/s")
-                            imageCapturedTxt.setText( captureCompleteTimeString)
-                        }
-                       })
-                        Log.d(TAG, captureCompleteTimeString.toString())
+                        getActivity().runOnUiThread(Runnable {
+                            run() {
+                                speedTxt.setText("${speed}km/h")
+                                if (imageCounter > lastImageCounter) {
+                                    imageCapturedTxt.setText(captureCompleteTimeString)
+                                    lastImageCounter++
+                                    Log.d(TAG, captureCompleteTimeString.toString())
+                                }
+                            }
+                        })
                         unlockFocus()
-                    }
+                        requestNextImage()
                 }
             }
 
