@@ -29,7 +29,6 @@ public class GPSLocation {
     }
 
     public void init() {
-        Logger.INSTANCE.writeToLogger("");
         if (ContextCompat.checkSelfPermission(activity,
                 Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -52,7 +51,7 @@ public class GPSLocation {
             public void onStatusChanged(String provider, int status, Bundle extras) {
                 Toast.makeText(activity, "LocationListener: methode: onStatusChanged: status: " + status, duration).show();
                 Logger.INSTANCE.writeToLogger("LocationListener: methode: onStatusChanged: status: " + status);
-                init();
+              //  init();
             }
             public void onProviderEnabled(String provider) {
                 Toast.makeText(activity, "LocationListener: methode: onProviderEnabled: provider: " + provider, duration).show();
@@ -66,7 +65,7 @@ public class GPSLocation {
             };
 
         // Registriert den listener mit den Location Manager um Lokations Updates zu erhalten
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,100,2,locationListener);
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,400,0,locationListener);
     }
 
     public Location getLocation() {

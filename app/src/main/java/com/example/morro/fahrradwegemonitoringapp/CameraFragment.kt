@@ -51,6 +51,7 @@ import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
 import android.widget.ToggleButton
 import com.example.android.camera2basic.*
 import kotlinx.android.synthetic.main.fragment_camera2_basic.*
@@ -95,11 +96,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Um die aktuelle Geschwindigkeit für den Nutzer sichtbar zu machen
      */
     private lateinit var speedTxt : TextView
-
-    /**
-     * Um Informationen auf dem UI auszugeben wie Anzahl der Bilder
-     */
-    private lateinit var imageCapturedTxt : TextView
 
     /**
      * Anzahl der gespeicherten Bilder
@@ -239,7 +235,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         if (image != null) {
             if (location != null) {
                 speed = (location.getSpeed() * 60 * 60) / 1000 // in km/h
-                if (((speed - 4.0f) > 0.0001)) {  // bei vorhandener Geschwindigkeit
+              //  if (((speed - 4.0f) > 0.0001)) {  // bei vorhandener Geschwindigkeit
                 speedBetweenCaptures = (speedLast + speed) / 2
                 if (imageCounter % (2000 * directoriesCounter) == 0) {
                     newFolder()
@@ -247,14 +243,20 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 saveFeatures(location)
                 saveImage(image)
                 speedLast = speed
-                getActivity().runOnUiThread(Runnable {
-                    run() {
-                        speedTxt.setText("${speedLast}km/h / ${imageCounter} Bilder")
-                    }})
-                } else {
-                    image.close()
-                 }
+                if (imageCounter % 100 == 0) {
+                    getActivity().runOnUiThread(Runnable {
+                        run() {
+                            speedTxt.setText("${speedLast}km/h / ${imageCounter} Bilder")
+                        }
+                    })
+                }
+             //   Thread.sleep(100)
+              //  } else {
+              //      image.close()
+              //   }
             } else {
+                Toast.makeText(activity, "Lokation war null", Toast.LENGTH_LONG)
+                Logger.writeToLogger("Lokation war null")
                 image.close()
             }
         }
@@ -262,7 +264,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
     /**
      * Prec.: Image != null
-     * Post.: Image is saved
+     * Post.: Bild ist abgespeichert
      */
     private fun saveImage(image: Image) {
             ImageSaver().saveImage(image, File(actualDirectory, ( "$lastSavedPictureTime" + ".jpg")))
@@ -270,9 +272,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Save Features: Time in ms/ GPS /
-     * Prec.: Location != null must calle before saveImage methode
-     * Postc.: Features are saved to a File and locationLast hold location info
+     * Speichert Features ab: Zeit in ms/ GPS /
+     * Prec.: Location != null, diese Methode muss vor der Methode saveImage aufgerufen werden
+     * Postc.: Features wurden in eine Datei geschrieben
      */
     private fun saveFeatures(location : Location) {
             if(imageCounter == 0) {
@@ -285,8 +287,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Prec.: - All imgages from ImageReader are acquired
-     * Postc.: Call method lockFocus if actualTakingPictures is true
+     * Prec.: - Alle Bilder vom ImageReader sind abgearbeitet
+     * Postc.: Wenn actualTakingPictures wahr ist wurde die Methode actualTakingPictures aufgerufen
      */
     private fun requestNextImage() {
         if(actualTakingPictures) {
@@ -295,7 +297,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Postc.: New Directory
+     * Mit dieser Methode kann ein neuer Ordner erstellt werden für Feature Daten.
+     * Prec.:
+     * Postc.: Ein neuer Ordner für die Features wurde erstellt
      */
     private fun newFolder() {
         if(imageCounter>1) {
@@ -304,6 +308,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("features.csv"))
+        fileLocation.appendText("Millisekunden,Breitengrad,Längengrad,Geschwindigkeit\n")
     }
 
     /**
@@ -352,8 +357,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     // CONTROL_AE_STATE can be null on some devices
                     val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
                     if (aeState == null ||
-                            aeState == CaptureResult.CONTROL_AE_STATE_PRECAPTURE ||
-                            aeState == CaptureRequest.CONTROL_AE_STATE_FLASH_REQUIRED) {
+                            aeState == CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
                         state = STATE_WAITING_NON_PRECAPTURE
                     }
                 }
@@ -407,7 +411,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         textureView = view.findViewById(R.id.texture)
         speedTxt = view.findViewById(R.id.speedTxt) as TextView
-        imageCapturedTxt = view.findViewById(R.id.imageCaptured) as TextView
         val toggleButton = view.findViewById(R.id.toggleButtonStart) as ToggleButton
         toggleButton?.setOnCheckedChangeListener { buttonView, isChecked ->
             if (isChecked) {
@@ -602,7 +605,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Opens the camera specified by [Camera2BasicFragment.cameraId].
+     * Opens the camera specified by [CameraFragment.cameraId].
      */
     private fun openCamera(width: Int, height: Int) {
         val permission = ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA)
@@ -700,12 +703,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
                             captureSession = cameraCaptureSession
                             try {
                                 // Auto focus should be continuous for camera preview.
-                                previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                                        CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
-                                // Flash is automatically enabled when necessary.
-                                //setAutoFlash(previewRequestBuilder)
-
-                                // Finally, we start displaying the camera preview.
+                               // previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+                                 //       CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
                                 previewRequest = previewRequestBuilder.build()
                                 captureSession?.setRepeatingRequest(previewRequest,
                                         captureCallback, backgroundHandler)
@@ -827,22 +826,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 override fun onCaptureCompleted(session: CameraCaptureSession,
                         request: CaptureRequest,
                         result: TotalCaptureResult) {
-                      //  var captureCompleteTimeMs = lastSavedPictureTime - startTime
-                      //  var captureTimeMinutes = (captureCompleteTimeMs / 1000) / 60
-                      //  var captureCompleteTimeString =
-                      //          "Speicherzeitpunkt: " + "$captureCompleteTimeMs" + "ms \n" +
-                      //                  "In Minuten: $captureTimeMinutes \n" +
-                      //                  "Aufgenommene Bilder: $imageCounter"
-                      //  getActivity().runOnUiThread(Runnable {
-                      //      run() {
-                      //          speedTxt.setText("${speed}km/h")
-                      //          if (imageCounter > lastImageCounter) {
-                      //              imageCapturedTxt.setText(captureCompleteTimeString)
-                      //              lastImageCounter++
-                      //              Log.d(TAG, captureCompleteTimeString.toString())
-                      //          }
-                      //      }
-                      //  })
                         unlockFocus()
                         requestNextImage()
                 }
@@ -943,12 +926,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
         /**
          * Max preview width that is guaranteed by Camera2 API
          */
-        private val MAX_PREVIEW_WIDTH = 1920
+        private val MAX_PREVIEW_WIDTH = 320
 
         /**
          * Max preview height that is guaranteed by Camera2 API
          */
-        private val MAX_PREVIEW_HEIGHT = 1024
+        private val MAX_PREVIEW_HEIGHT = 240
 
         /**
          * Given `choices` of `Size`s supported by a camera, choose the smallest one that

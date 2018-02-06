@@ -63,16 +63,4 @@
         android:textSize="24sp"
         android:textStyle="bold|italic" />
 
-    <TextView
-        android:id="@+id/imageCaptured"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/toggleButtonStart"
-        android:layout_marginStart="70dp"
-        android:layout_marginTop="64dp"
-        android:layout_toEndOf="@+id/speedTxt"
-        android:text="            "
-        android:textColor="@android:color/background_light"
-        android:textSize="14sp" />
-
 </RelativeLayout>
