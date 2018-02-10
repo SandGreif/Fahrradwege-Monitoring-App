@@ -15,6 +15,8 @@ import android.widget.Toast;
 import java.io.File;
 
 /**
+ * Diese Klasse dient dazu eine GPS Lokation anzubieten. Der Zustand der Lokation wird mit Hilfe
+ * des locationListener stetig aktualisiert.
  * Created by morro on 26.01.2018.
  */
 
@@ -23,6 +25,12 @@ public class GPSLocation {
     private Location locationExemplar;
 
     private Activity activity;
+
+    /**
+     * Wird benötigt um abzufragen ob  beim letzten Aufruf der callback Methode
+     * onStatusChanged der Status 2 war
+     */
+    private int providerLastStatus = 0;
 
     public GPSLocation(Activity activity) {
         this.activity = activity;
@@ -36,7 +44,6 @@ public class GPSLocation {
                 ActivityCompat.requestPermissions(activity,
                         new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                         1);
-
         }
 
         LocationManager locationManager = (LocationManager) activity.getSystemService(Context.LOCATION_SERVICE);
@@ -49,18 +56,38 @@ public class GPSLocation {
                  locationExemplar = location;
             }
             public void onStatusChanged(String provider, int status, Bundle extras) {
-                Toast.makeText(activity, "LocationListener: methode: onStatusChanged: status: " + status, duration).show();
-                Logger.INSTANCE.writeToLogger("LocationListener: methode: onStatusChanged: status: " + status);
-              //  init();
+                String statusTxt = "";
+                switch(status) {
+                    case 0:
+                        statusTxt = "OUT_OF_SERVICE";
+                        providerLastStatus = 0;
+                        break;
+                    case 1:
+                        statusTxt = "TEMPORARILY_UNAVAILABLE";
+                        providerLastStatus = 1;
+                        break;
+                    case 2:
+                        statusTxt = "AVAILABLE";
+                        break;
+                    default:
+                        statusTxt = "no valid state found";
+                        providerLastStatus = -1;
+                }
+                if (providerLastStatus != 2) {
+                    Toast.makeText(activity, "LocationListener: Methode: onStatusChanged: Status: " + statusTxt, duration).show();
+                    Logger.INSTANCE.writeToLogger("LocationListener: methode: onStatusChanged: status: " + status);
+                }
+                if(status == 2) {
+                    providerLastStatus = 2;
+                }
             }
             public void onProviderEnabled(String provider) {
-                Toast.makeText(activity, "LocationListener: methode: onProviderEnabled: provider: " + provider, duration).show();
+                Toast.makeText(activity, "LocationListener: Methode: onProviderEnabled: provider: " + provider, duration).show();
                 Logger.INSTANCE.writeToLogger("LocationListener: methode: onProviderEnabled: provider: " + provider);
             }
             public void onProviderDisabled(String provider) {
-                Toast.makeText(activity, "LocationListener: methode: onProviderDisabled: provider: " + provider, duration).show();
+                Toast.makeText(activity, "LocationListener: Methode: onProviderDisabled: provider: " + provider, duration).show();
                 Logger.INSTANCE.writeToLogger("LocationListener: methode: onProviderEnabled: provider: " + provider);
-                init();
             }
             };
 

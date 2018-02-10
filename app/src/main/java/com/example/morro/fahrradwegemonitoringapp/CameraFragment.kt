@@ -112,6 +112,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private val captureWidth: Int = 960
 
     /**
+     * Gibt an ob gerade ein Bild gespeichert wird
+     */
+    private var isSavingPictureRequest: Boolean = true
+
+    /**
      * An [AutoFitTextureView] for camera preview.
      */
     private lateinit var textureView: AutoFitTextureView
@@ -132,13 +137,19 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private lateinit var previewSize: Size
 
     /**
-     * Class for GPS Handling
+     * Klasse um  GPS Anfragen abzuhandeln
      */
     private lateinit var gpsLocation: GPSLocation
 
     private  var startTime: Long = 0
 
     private  var lastSavedPictureTime: Long = 0
+
+    /**
+     * Breiten und Längengrad bei der letzten
+     */
+    private var locationLastLatitude: Float = 0.0f
+    private var locationLastLongtitude: Float = 0.0f
 
     /**
      * actual speed  in km/h
@@ -149,11 +160,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * last speed measured related to the last captured image in km/h
      */
     private var speedLast: Float = 0.0f
-
-    /**
-     * Last GPS location
-     */
-    private lateinit var locationLast: Location
 
     /**
      * Speed in km/h betwenn two captured images
@@ -250,6 +256,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
                         }
                     })
                 }
+                if(image != null)
+                    image.close()
+                isSavingPictureRequest = false
              //   Thread.sleep(100)
               //  } else {
               //      image.close()
@@ -260,6 +269,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 image.close()
             }
         }
+        requestNextImage()
     }
 
     /**
@@ -278,12 +288,14 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     private fun saveFeatures(location : Location) {
             if(imageCounter == 0) {
-                locationLast = location
+                locationLastLatitude = location.latitude.toFloat()
+                locationLastLongtitude =  location.longitude.toFloat()
             }
-            var latitudeAverage = (location.latitude + locationLast.latitude) / 2
-            var longitudeAverage = (location.longitude + locationLast.longitude) / 2
-            fileLocation.appendText("${lastSavedPictureTime},${latitudeAverage.toFloat()},${longitudeAverage.toFloat()},${speedBetweenCaptures}\n")
-            locationLast = location
+            var latitudeAverage = (location.latitude.toFloat() + locationLastLatitude) / 2
+            var longitudeAverage = (location.longitude.toFloat() + locationLastLongtitude) / 2
+            fileLocation.appendText("${lastSavedPictureTime},${latitudeAverage},${longitudeAverage},${speedBetweenCaptures}\n")
+            locationLastLatitude = location.latitude.toFloat()
+            locationLastLongtitude =  location.longitude.toFloat()
     }
 
     /**
@@ -308,7 +320,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("features.csv"))
-        fileLocation.appendText("Millisekunden,Breitengrad,Längengrad,Geschwindigkeit\n")
+        fileLocation.appendText("Millisekunden,Breitengrad,Laengengrad,Geschwindigkeit\n")
     }
 
     /**
@@ -819,15 +831,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 // Use the same AE and AF modes as the preview.
                 set(CaptureRequest.CONTROL_AF_MODE,
                         CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
-            }//?.also { setAutoFlash(it) }
-
+            }
             val captureCallback = object : CameraCaptureSession.CaptureCallback() {
-
                 override fun onCaptureCompleted(session: CameraCaptureSession,
                         request: CaptureRequest,
                         result: TotalCaptureResult) {
                         unlockFocus()
-                        requestNextImage()
                 }
             }
 
