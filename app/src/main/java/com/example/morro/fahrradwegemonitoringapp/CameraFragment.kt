@@ -107,9 +107,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     private var directoriesCounter : Int = 1
 
-    private val captureHeight: Int = 1280
+    private val captureHeight: Int = 1920
 
-    private val captureWidth: Int = 960
+    private val captureWidth: Int = 1080
 
     /**
      * Gibt an ob gerade ein Bild gespeichert wird
@@ -516,7 +516,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
         try {
             for (cameraId in manager.cameraIdList) {
                 val characteristics = manager.getCameraCharacteristics(cameraId)
-
                 // We don't use a front facing camera in this sample.
                 val cameraDirection = characteristics.get(CameraCharacteristics.LENS_FACING)
                 if (cameraDirection != null &&
@@ -703,6 +702,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
             )
             previewRequestBuilder.addTarget(surface)
 
+
             // Here, we create a CameraCaptureSession for camera preview.
             cameraDevice?.createCaptureSession(Arrays.asList(surface, imageReader?.surface),
                     object : CameraCaptureSession.StateCallback() {
@@ -715,8 +715,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
                             captureSession = cameraCaptureSession
                             try {
                                 // Auto focus should be continuous for camera preview.
-                               // previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                                 //       CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+                               previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+                                        CaptureRequest.CONTROL_AF_MODE_OFF)
+                                previewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 1.2f)
                                 previewRequest = previewRequestBuilder.build()
                                 captureSession?.setRepeatingRequest(previewRequest,
                                         captureCallback, backgroundHandler)
@@ -776,8 +777,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun lockFocus() {
         try {
             // This is how to tell the camera to lock focus.
-            previewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
-                    CameraMetadata.CONTROL_AF_TRIGGER_START)
             // Tell #captureCallback to wait for the lock.
             state = STATE_WAITING_LOCK
             captureSession?.capture(previewRequestBuilder.build(), captureCallback,
@@ -828,15 +827,17 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 set(CaptureRequest.JPEG_ORIENTATION,
                         (ORIENTATIONS.get(rotation) + sensorOrientation + 270) % 360)
 
-                // Use the same AE and AF modes as the preview.
                 set(CaptureRequest.CONTROL_AF_MODE,
-                        CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+                        CaptureRequest.CONTROL_AF_MODE_OFF)
+                set(CaptureRequest.LENS_FOCUS_DISTANCE, 1.2f)
+                set(CaptureRequest.JPEG_GPS_LOCATION, gpsLocation.location)
             }
             val captureCallback = object : CameraCaptureSession.CaptureCallback() {
                 override fun onCaptureCompleted(session: CameraCaptureSession,
                         request: CaptureRequest,
                         result: TotalCaptureResult) {
-                        unlockFocus()
+                      unlockFocus()
+
                 }
             }
 
@@ -858,9 +859,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun unlockFocus() {
         try {
             // Reset the auto-focus trigger
-            previewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
-                    CameraMetadata.CONTROL_AF_TRIGGER_CANCEL)
-            //setAutoFlash(previewRequestBuilder)
             captureSession?.capture(previewRequestBuilder.build(), captureCallback,
                     backgroundHandler)
             // After this, the camera will go back to the normal state of preview.
