@@ -137,6 +137,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private lateinit var previewSize: Size
 
     /**
+     * Klassen Objekt um die Beschleunigungssensordaten zu erhalten
+     */
+    private lateinit var accelerometer: AccelerometerSensor
+
+    /**
      * Klasse um  GPS Anfragen abzuhandeln
      */
     private lateinit var gpsLocation: GPSLocation
@@ -437,6 +442,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         super.onActivityCreated(savedInstanceState)
         askForPermissionsExternalStorage()
         time = Time()
+        accelerometer = AccelerometerSensor(this.activity)
         gpsLocation = GPSLocation(activity)
         startTime = time.getTime()
         gpsLocation.init()
