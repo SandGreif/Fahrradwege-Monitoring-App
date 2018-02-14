@@ -92,7 +92,7 @@ public class GPSLocation {
             };
 
         // Registriert den listener mit den Location Manager um Lokations Updates zu erhalten
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,400,0,locationListener);
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,200,1,locationListener);
     }
 
     public Location getLocation() {
