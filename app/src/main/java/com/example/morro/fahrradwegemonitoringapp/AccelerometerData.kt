@@ -11,20 +11,19 @@ import android.view.WindowManager
 import java.lang.Math.abs
 import java.math.RoundingMode
 import java.text.DecimalFormat
-import java.text.DecimalFormatSymbols
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.math.sqrt
 
 
 /**
  *  Mit dieser Klasse können Sensordaten des Beschleunigungssensors ausgelesen werden.
- *  Genutzt werden die daten des Sensors "Accelerometer". Diese beinhalten die Beschleunigungsdaten
- *  mit Gravitationsdaten. Die Berechnung von Gier Nick Roll kommt aus diesem Tutorial:
+ *  Genutzt werden die daten des "Accelerometer" und des "Magnetic Field" Sensors. Die Beschleunigungssensordaten
+ *  beinhalten die Beschleunigungsdaten mit Gravitationsdaten. Die Berechnung von Gier Nick Roll kommt aus diesem Tutorial:
  *  https://github.com/google-developer-training/android-advanced/tree/master/TiltSpot
  * Von Julian Magierski am 13.02.2018 erstellt.
  */
 
-class AccelerometerSensor : SensorEventListener {
+class AccelerometerData : SensorEventListener {
 
     private var mSensorManager: SensorManager? = null
     private var mAccelerometer: Sensor? = null
@@ -92,7 +91,7 @@ class AccelerometerSensor : SensorEventListener {
         if (event != null && isDataGatheringActive) {
             lock.lock()
             try {
-            val sensorType = event.sensor.getType()
+            val sensorType = event.sensor.type
             when (sensorType) {
                 Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
                 Sensor.TYPE_MAGNETIC_FIELD -> mMagnetometerData = event.values.clone()
@@ -110,7 +109,7 @@ class AccelerometerSensor : SensorEventListener {
 
             // Remap the matrix based on current device/activity rotation.
             var rotationMatrixAdjusted = FloatArray(9)
-            when (mDisplay?.getRotation()) {
+            when (mDisplay?.rotation) {
                 Surface.ROTATION_0 -> rotationMatrixAdjusted = rotationMatrix.clone()
                 Surface.ROTATION_90 -> SensorManager.remapCoordinateSystem(rotationMatrix,
                         SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X,
@@ -135,9 +134,9 @@ class AccelerometerSensor : SensorEventListener {
             azimuthList?.add(orientationValues[0])
             pitchList?.add(orientationValues[1])
             rollList?.add(orientationValues[2])
-            xAxisList?.add(event.values.get(0))
-            yAxisList?.add(event.values.get(1))
-            zAxisList?.add(event.values.get(2))
+            xAxisList?.add(event.values[0])
+            yAxisList?.add(event.values[1])
+            zAxisList?.add(event.values[2])
             samplesCounter++
             } finally {
                 lock.unlock()
@@ -151,7 +150,7 @@ class AccelerometerSensor : SensorEventListener {
      * Postc.: Daten werden erfasst
      */
     fun startDataCollection() {
-        if(isDataGatheringActive == false)
+        if(!isDataGatheringActive)
             samplesCounter = 0
             isDataGatheringActive = true
     }
@@ -180,19 +179,19 @@ class AccelerometerSensor : SensorEventListener {
             lock.lock()
             try {
                 // Berechne Mittelwert, Variant und Standardabweichung
-                var meanX = calculateMean(xAxisList)
-                var varianceX = calculateVariance(meanX, xAxisList)
-                var standardDevX = calculateStandardDeviation(varianceX)
-                var meanY = calculateMean(yAxisList)
-                var varianceY = calculateVariance(meanY, yAxisList)
-                var standardDevY = calculateStandardDeviation(varianceY)
-                var meanZ = calculateMean(zAxisList)
-                var varianceZ = calculateVariance(meanZ, zAxisList)
-                var standardDevZ = calculateStandardDeviation(varianceZ)
+                val meanX = calculateMean(xAxisList, samplesCounter)
+                val varianceX = calculateVariance(meanX, xAxisList, samplesCounter)
+                val standardDevX = calculateStandardDeviation(varianceX)
+                val meanY = calculateMean(yAxisList, samplesCounter)
+                val varianceY = calculateVariance(meanY, yAxisList, samplesCounter)
+                val standardDevY = calculateStandardDeviation(varianceY)
+                val meanZ = calculateMean(zAxisList, samplesCounter)
+                val varianceZ = calculateVariance(meanZ, zAxisList, samplesCounter)
+                val standardDevZ = calculateStandardDeviation(varianceZ)
                 // Berechne Mittelwert für Gier-Nick-Roll
-                var meanAzimuth = calculateMean(azimuthList)
-                var meanPitch = calculateMean(pitchList)
-                var meanRoll = calculateMean(rollList)
+                val meanAzimuth = calculateMean(azimuthList, samplesCounter)
+                val meanPitch = calculateMean(pitchList, samplesCounter)
+                val meanRoll = calculateMean(rollList, samplesCounter)
                 // Representation der erfassten Daten als String. Kommas werden durch Punkte ersetzt.
                 return df.format(meanX).replace(',', '.') + "," + df.format(varianceX).replace(',', '.') + "," +
                         df.format(standardDevX).replace(',', '.') + "," + df.format(meanY).replace(',', '.') + "," +
@@ -223,18 +222,19 @@ class AccelerometerSensor : SensorEventListener {
     }
 
     /**
-     * Berechnet den  Mittelwert über die Elemente Float einer Liste
+     * Berechnet den  Mittelwert über die Float Elemente einer Liste. Die Anzahl der Werte muss als
+     * Parameter numberOfSamples übergeben werden.
      * Prec.:
      * Postc.: Der Mittelwert über die Float Elemente der übergebenen Liste,
      * wenn samplesCounter ist größer 0
      */
-    fun calculateMean(list : MutableList<Float>?) : Float {
+    fun calculateMean(list : MutableList<Float>?, numberOfSamples : Int) : Float {
         var sum = 0f
-        if (samplesCounter > 0) {
+        if (numberOfSamples > 0) {
             list?.forEach {
                 sum += it
             }
-            return sum / samplesCounter
+            return sum / numberOfSamples
         } else {
             return 0f
         }
@@ -243,11 +243,12 @@ class AccelerometerSensor : SensorEventListener {
     /**
      * Berechnet die Varianz. Dieser Funktion muss als Paramter der Mittelwert (mean) und die Liste mit
      * den Float Werten übergeben werden, um die Varianz zu berechnen. Als Varianz wird der Durchschnitt der quadrierten
-     * Differenzen zum Mittelwert bezeichnet.
+     * Differenzen zum Mittelwert bezeichnet. Die Anzahl der Werte muss als
+     * Parameter numberOfSamples übergeben werden.
      * Prec.:
      * Postc.: Gibt die berechnete Variance als Float zurück oder 0 wenn samplesCounter <= 0
      */
-    fun calculateVariance(mean : Float, list : MutableList<Float>?) : Float {
+    fun calculateVariance(mean : Float, list : MutableList<Float>?, numberOfSamples : Int) : Float {
         var variance = 0f
         var sum = 0f
         var tempDifference = 0f
@@ -256,7 +257,7 @@ class AccelerometerSensor : SensorEventListener {
                 tempDifference = (it-mean)
                 sum += tempDifference * tempDifference
             }
-            return sum / samplesCounter
+            return sum / numberOfSamples
         } else {
             return 0f
         }
@@ -268,7 +269,7 @@ class AccelerometerSensor : SensorEventListener {
      * Postc.:  Standardabweichung wird zurückgegeben. Für die Berechnung wird der Absolutwert von der Varianz genommen.
      */
     fun calculateStandardDeviation(variance : Float) : Float{
-        var x = abs(variance)
+        val x = abs(variance)
         return sqrt(x)
     }
 }

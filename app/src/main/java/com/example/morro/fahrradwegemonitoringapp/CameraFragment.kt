@@ -134,7 +134,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     /**
      * Klassen Objekt um die Beschleunigungssensordaten zu erhalten
      */
-    private lateinit var accelerometer: AccelerometerSensor
+    private lateinit var accelerometer: AccelerometerData
 
     /**
      * Klasse um  GPS Anfragen abzuhandeln
@@ -241,7 +241,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val image = it.acquireLatestImage()
         accelerometer.stopDataCollection()
         lastSavedPictureTime = time.getTime()
-        val location = gpsLocation.getLocation()
+        val location = gpsLocation.getLokation()
         if (image != null) {
             if (location != null) {
                 speed = (location.speed * 60 * 60) / 1000 // in km/h
@@ -433,9 +433,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
         textureView = view.findViewById(R.id.texture)
         speedTxt = view.findViewById(R.id.speedTxt) as TextView
         val toggleButton = view.findViewById(R.id.toggleButtonStart) as ToggleButton
-        toggleButton.setOnCheckedChangeListener { _, isChecked ->
+        toggleButton.setOnCheckedChangeListener { button, isChecked ->
             if (isChecked) {
-                takePictures()
+                if(!takePictures())
+                    toggleButton.toggle()
             } else {
                 stopPictures()
             }
@@ -450,7 +451,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         super.onActivityCreated(savedInstanceState)
         askForPermissionsExternalStorage()
         time = Time()
-        accelerometer = AccelerometerSensor(this.activity)
+        accelerometer = AccelerometerData(this.activity)
         gpsLocation = GPSLocation(activity)
         startTime = time.getTime()
         gpsLocation.init()
@@ -846,7 +847,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 set(CaptureRequest.CONTROL_AF_MODE,
                         CaptureRequest.CONTROL_AF_MODE_OFF)
                 set(CaptureRequest.LENS_FOCUS_DISTANCE, 1.2f)
-                set(CaptureRequest.JPEG_GPS_LOCATION, gpsLocation.location)
+                set(CaptureRequest.JPEG_GPS_LOCATION, gpsLocation.getLokation())
             }
             val captureCallback = object : CameraCaptureSession.CaptureCallback() {
                 override fun onCaptureCompleted(session: CameraCaptureSession,
@@ -886,13 +887,19 @@ class CameraFragment : Fragment(), View.OnClickListener,
         }
     }
 
-    private fun takePictures () {
+    private fun takePictures() : Boolean {
+        val result : Boolean
         if (!buttonCaptureRequestActive && !activeImageCapturing) {
             buttonCaptureRequestActive = true
             activeImageCapturing = true
-            Toast.makeText(activity, "Bilder werden aufgenommen", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, "Daten werden erfasst", Toast.LENGTH_SHORT).show()
+            result = true
             lockFocus()
+        } else {
+            Toast.makeText(activity, "Daten erfassung gestoppt", Toast.LENGTH_SHORT).show()
+            result = false
         }
+        return result
     }
 
     private fun stopPictures () {
