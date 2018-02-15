@@ -5,13 +5,14 @@ import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
-import android.hardware.SensorManager
-import android.view.Display
+import android.hardware.SensorManager import android.view.Display
 import android.view.Surface
 import android.view.WindowManager
-import android.widget.Toast
 import java.lang.Math.abs
-import java.lang.Math.sqrt
+import java.math.RoundingMode
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.math.sqrt
 
 
@@ -44,6 +45,12 @@ class AccelerometerSensor : SensorEventListener {
     // for X, Y, and Z.
     private var mAccelerometerData = FloatArray(3)
     private var mMagnetometerData = FloatArray(3)
+
+    /**
+     * Um Datenwerte aufzurunden auf 5 Kommastellen
+     */
+    private var  df = DecimalFormat("#.#####")
+
     /**
      * Boolean Variable die angibt ob Daten Samples gesammelt werden sollen
      */
@@ -57,13 +64,17 @@ class AccelerometerSensor : SensorEventListener {
      */
     private var samplesCounter: Int = 0
 
+    private var lock = ReentrantLock()
+
     constructor(activity: Activity) {
+        // Datenwerte sollen aufgerunded werden auf 5 Kommastellen
+        df.roundingMode = RoundingMode.CEILING
         this.activity = activity
         mSensorManager = activity.getSystemService(Context.SENSOR_SERVICE) as SensorManager?
         mAccelerometer = mSensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        mSensorManager?.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_NORMAL)
+        mSensorManager?.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_FASTEST)
         mMagneticField = mSensorManager?.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
-        mSensorManager?.registerListener(this, mMagneticField, SensorManager.SENSOR_DELAY_NORMAL)
+        mSensorManager?.registerListener(this, mMagneticField, SensorManager.SENSOR_DELAY_FASTEST)
         xAxisList = mutableListOf()
         yAxisList = mutableListOf()
         zAxisList = mutableListOf()
@@ -79,6 +90,8 @@ class AccelerometerSensor : SensorEventListener {
     }
     override fun onSensorChanged(event: SensorEvent?) {
         if (event != null && isDataGatheringActive) {
+            lock.lock()
+            try {
             val sensorType = event.sensor.getType()
             when (sensorType) {
                 Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
@@ -126,6 +139,9 @@ class AccelerometerSensor : SensorEventListener {
             yAxisList?.add(event.values.get(1))
             zAxisList?.add(event.values.get(2))
             samplesCounter++
+            } finally {
+                lock.unlock()
+            }
         }
     }
 
@@ -142,39 +158,68 @@ class AccelerometerSensor : SensorEventListener {
 
     /**
      * Diese Funktion stopt die Datenerfassung dieser Klasse.
-     *
      * Prec.:
-     * Postc.: Gibt berechnete Daten als zurück, wenn isDataGatheringActive ist true
+     * Postc.: Es werden keine Daten mehr erfasst
      */
-    fun stopDataCollection() : String? {
+    fun stopDataCollection() {
         if(isDataGatheringActive) {
             isDataGatheringActive = false
-            // Berechne Mittelwert, Variant und Standardabweichung
-            var meanX = calculateMean(xAxisList)
-            var varianceX = calculateVariance(meanX, xAxisList)
-            var standardDevX = calculateStandardDeviation(varianceX)
-            var meanY = calculateMean(yAxisList)
-            var varianceY = calculateVariance(meanY, yAxisList)
-            var standardDevY = calculateStandardDeviation(varianceY)
-            var meanZ = calculateMean(zAxisList)
-            var varianceZ = calculateVariance(meanZ, zAxisList)
-            var standardDevZ = calculateStandardDeviation(varianceZ)
-            // Berechne Mittelwert für Gier-Nick-Roll
-            var meanAzimuth = calculateMean(azimuthList)
-            var meanPitch = calculateMean(pitchList)
-            var meanRoll = calculateMean(rollList)
-            // Entfernt alle Elemente aus den Listen
-            xAxisList?.clear()
-            yAxisList?.clear()
-            zAxisList?.clear()
-            azimuthList?.clear()
-            pitchList?.clear()
-            rollList?.clear()
+        }
+    }
 
-            return "$meanX,$varianceX,$standardDevX,$meanY,$varianceY,$standardDevY,$meanZ,$varianceZ,$standardDevZ," +
-                    "$meanAzimuth,$meanPitch,$meanRoll"
+    /*
+    * Von den erfasten Daten wird der Mittelwert die Varianz und die Standardabweichung berechnet.
+    * Der Rückgabe-Sting hat folgende Formattierung: Mittelwert von X, Varianz von X, Standardabweichung von X,
+    * Mittelwert von Y, Varianz von Y, Standardabweichung von Y, Mittelwert von Z, Varianz von Z, Standardabweichung von Z,
+    * Azimuth, Pitch, Roll
+    *  Prec.:
+     * Postc.: Gibt berechnete Daten als String zurück, wenn isDataGatheringActive ist true ansonsten null
+    */
+    fun getData() : String? {
+        if(!isDataGatheringActive) {
+            lock.lock()
+            try {
+                // Berechne Mittelwert, Variant und Standardabweichung
+                var meanX = calculateMean(xAxisList)
+                var varianceX = calculateVariance(meanX, xAxisList)
+                var standardDevX = calculateStandardDeviation(varianceX)
+                var meanY = calculateMean(yAxisList)
+                var varianceY = calculateVariance(meanY, yAxisList)
+                var standardDevY = calculateStandardDeviation(varianceY)
+                var meanZ = calculateMean(zAxisList)
+                var varianceZ = calculateVariance(meanZ, zAxisList)
+                var standardDevZ = calculateStandardDeviation(varianceZ)
+                // Berechne Mittelwert für Gier-Nick-Roll
+                var meanAzimuth = calculateMean(azimuthList)
+                var meanPitch = calculateMean(pitchList)
+                var meanRoll = calculateMean(rollList)
+                // Representation der erfassten Daten als String. Kommas werden durch Punkte ersetzt.
+                return df.format(meanX).replace(',', '.') + "," + df.format(varianceX).replace(',', '.') + "," +
+                        df.format(standardDevX).replace(',', '.') + "," + df.format(meanY).replace(',', '.') + "," +
+                        df.format(varianceY).replace(',', '.') + "," + df.format(standardDevY).replace(',', '.') + "," +
+                        df.format(meanZ).replace(',', '.') + "," + df.format(varianceZ).replace(',', '.') + "," +
+                        df.format(standardDevZ).replace(',', '.') + "," + df.format(meanAzimuth).replace(',', '.') + "," +
+                        df.format(meanPitch).replace(',', '.') + "," + df.format(meanRoll).replace(',', '.')
+            } finally {
+              lock.unlock()
+            }
         }
         return null
+    }
+
+    /**
+     * Die Funktion entfernt alle Elemente aus den Datenlisten:
+     * xAxisList, yAxisList, zAxisList, azimuthList, pitchList, rollList
+     * Prec.:
+     * Postc.: Die angegebenen Listen haben keine Elemente mehr
+     */
+    fun clearData() {
+        xAxisList?.clear()
+        yAxisList?.clear()
+        zAxisList?.clear()
+        azimuthList?.clear()
+        pitchList?.clear()
+        rollList?.clear()
     }
 
     /**

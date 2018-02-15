@@ -31,7 +31,6 @@ import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
-import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
@@ -54,7 +53,6 @@ import android.widget.TextView
 import android.widget.Toast
 import android.widget.ToggleButton
 import com.example.android.camera2basic.*
-import kotlinx.android.synthetic.main.fragment_camera2_basic.*
 import java.io.File
 import java.util.*
 import java.util.Collections.max
@@ -90,7 +88,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     private lateinit var cameraId: String
 
-    private var actualTakingPictures : Boolean = false
+    @Volatile private var buttonCaptureRequestActive : Boolean = false
+
+    private var  activeImageCapturing : Boolean = false
 
     /**
      * Um die aktuelle Geschwindigkeit für den Nutzer sichtbar zu machen
@@ -110,11 +110,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private val captureHeight: Int = 1920
 
     private val captureWidth: Int = 1080
-
-    /**
-     * Gibt an ob gerade ein Bild gespeichert wird
-     */
-    private var isSavingPictureRequest: Boolean = true
 
     /**
      * An [AutoFitTextureView] for camera preview.
@@ -148,8 +143,15 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
     private  var startTime: Long = 0
 
+    /*
+    * Gibt an wann das letzte Bild zum speichern bei den Image Listener verarbeitet wurde
+    */
     private  var lastSavedPictureTime: Long = 0
 
+    /**
+     * Gibt an wann die Datenerfassung der Beschleunigungsdaten plus Gier-Nick-Roll gestartet wurde
+     */
+    private var startGetAccelerometerDataTime: Long = 0
     /**
      * Breiten und Längengrad bei der letzten
      */
@@ -216,11 +218,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private var imageReader: ImageReader? = null
 
     /**
-     * This is the output file for our picture.
-     */
-    private lateinit var file: File
-
-    /**
      * root directory path
      */
     private lateinit var letDirectory: File
@@ -235,17 +232,19 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     private lateinit var fileLocation: File
 
+
     /**
      * This a callback object for the [ImageReader]. "onImageAvailable" will be called when a
      * still image is ready to be saved.
      */
     private val onImageAvailableListener = ImageReader.OnImageAvailableListener {
         val image = it.acquireLatestImage()
+        accelerometer.stopDataCollection()
         lastSavedPictureTime = time.getTime()
-        var location = gpsLocation.getLocation()
+        val location = gpsLocation.getLocation()
         if (image != null) {
             if (location != null) {
-                speed = (location.getSpeed() * 60 * 60) / 1000 // in km/h
+                speed = (location.speed * 60 * 60) / 1000 // in km/h
               //  if (((speed - 4.0f) > 0.0001)) {  // bei vorhandener Geschwindigkeit
                 speedBetweenCaptures = (speedLast + speed) / 2
                 if (imageCounter % (2000 * directoriesCounter) == 0) {
@@ -256,21 +255,18 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 speedLast = speed
                 if (imageCounter % 100 == 0) {
                     getActivity().runOnUiThread(Runnable {
-                        run() {
+                        run({
                             speedTxt.setText("${speedLast}km/h / ${imageCounter} Bilder")
-                        }
+                        })
                     })
                 }
-                if(image != null)
-                    image.close()
-                isSavingPictureRequest = false
              //   Thread.sleep(100)
               //  } else {
               //      image.close()
               //   }
             } else {
-                Toast.makeText(activity, "Lokation war null", Toast.LENGTH_LONG)
-                Logger.writeToLogger("Lokation war null")
+                Toast.makeText(activity, "Lokation war null", Toast.LENGTH_SHORT).show()
+                Logger.writeToLogger("Lokation war null \n")
                 image.close()
             }
         }
@@ -296,9 +292,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 locationLastLatitude = location.latitude.toFloat()
                 locationLastLongtitude =  location.longitude.toFloat()
             }
-            var latitudeAverage = (location.latitude.toFloat() + locationLastLatitude) / 2
-            var longitudeAverage = (location.longitude.toFloat() + locationLastLongtitude) / 2
-            fileLocation.appendText("${lastSavedPictureTime},${latitudeAverage},${longitudeAverage},${speedBetweenCaptures}\n")
+            val latitudeAverage = (location.latitude.toFloat() + locationLastLatitude) / 2
+            val longitudeAverage = (location.longitude.toFloat() + locationLastLongtitude) / 2
+            val accelerometerString = accelerometer.getData()
+            val captureTime = lastSavedPictureTime-startGetAccelerometerDataTime
+            fileLocation.appendText("$lastSavedPictureTime,$latitudeAverage,$longitudeAverage," +
+                 "$speedBetweenCaptures,$accelerometerString,$captureTime,TAKINGPICTURES \n")
             locationLastLatitude = location.latitude.toFloat()
             locationLastLongtitude =  location.longitude.toFloat()
     }
@@ -308,8 +307,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Postc.: Wenn actualTakingPictures wahr ist wurde die Methode actualTakingPictures aufgerufen
      */
     private fun requestNextImage() {
-        if(actualTakingPictures) {
+        if(buttonCaptureRequestActive) {
             lockFocus()
+        } else {
+            activeImageCapturing = false
         }
     }
 
@@ -325,7 +326,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("features.csv"))
-        fileLocation.appendText("Millisekunden,Breitengrad,Laengengrad,Geschwindigkeit\n")
+        fileLocation.appendText("Millisekunden,Breitengrad,Laengengrad,Geschwindigkeit," +
+                "MittelwertX,VarianzX,StandardabweichungX,MittelwertY,VarianzY,StandardabweichungY,MittelwertZ,VarianzZ,StandardabweichungZ," +
+                "Azimuth,Pitch,Roll,Aufnahmezeit \n")
     }
 
     /**
@@ -416,6 +419,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 request: CaptureRequest,
                 result: TotalCaptureResult) {
             process(result)
+
         }
 
     }
@@ -429,7 +433,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         textureView = view.findViewById(R.id.texture)
         speedTxt = view.findViewById(R.id.speedTxt) as TextView
         val toggleButton = view.findViewById(R.id.toggleButtonStart) as ToggleButton
-        toggleButton?.setOnCheckedChangeListener { buttonView, isChecked ->
+        toggleButton.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
                 takePictures()
             } else {
@@ -438,6 +442,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
         }
     }
 
+    /**
+     * Hier werden alle Objekte initialisiert.
+     * Zudem wird die erlaubnis abgefragt den Externen Speicher zu nutzen.
+     */
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
         askForPermissionsExternalStorage()
@@ -454,7 +462,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
     /**
      * Prec.: /
-     * Postc.: Reand and write permission to external storage granted
+     * Postc.: Schreib und Lesezugriff für den Externen Speicher gegeben
      */
     private fun askForPermissionsExternalStorage() {
         if (ContextCompat.checkSelfPermission(activity,
@@ -784,13 +792,15 @@ class CameraFragment : Fragment(), View.OnClickListener,
         try {
             // This is how to tell the camera to lock focus.
             // Tell #captureCallback to wait for the lock.
+            accelerometer.clearData()
+            startGetAccelerometerDataTime = time.getTime()
+            accelerometer.startDataCollection()
             state = STATE_WAITING_LOCK
             captureSession?.capture(previewRequestBuilder.build(), captureCallback,
                     backgroundHandler)
         } catch (e: CameraAccessException) {
             Log.e(TAG, e.toString())
         }
-
     }
 
     /**
@@ -842,8 +852,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 override fun onCaptureCompleted(session: CameraCaptureSession,
                         request: CaptureRequest,
                         result: TotalCaptureResult) {
-                      unlockFocus()
-
+                    unlockFocus()
                 }
             }
 
@@ -855,7 +864,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
         } catch (e: CameraAccessException) {
             Log.e(TAG, e.toString())
         }
-
+        // Nach der Aufnahme wird der Kamera Zustand aus preview gesetzt
+        unlockFocus()
     }
 
     /**
@@ -865,8 +875,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun unlockFocus() {
         try {
             // Reset the auto-focus trigger
-            captureSession?.capture(previewRequestBuilder.build(), captureCallback,
-                    backgroundHandler)
+        //    captureSession?.capture(previewRequestBuilder.build(), captureCallback,
+            //        backgroundHandler)
             // After this, the camera will go back to the normal state of preview.
             state = STATE_PREVIEW
             captureSession?.setRepeatingRequest(previewRequest, captureCallback,
@@ -877,18 +887,19 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     private fun takePictures () {
-        if (!actualTakingPictures) {
-            actualTakingPictures = true
+        if (!buttonCaptureRequestActive && !activeImageCapturing) {
+            buttonCaptureRequestActive = true
+            activeImageCapturing = true
+            Toast.makeText(activity, "Bilder werden aufgenommen", Toast.LENGTH_SHORT).show()
             lockFocus()
         }
     }
 
     private fun stopPictures () {
-            actualTakingPictures = false
+        buttonCaptureRequestActive = false
     }
 
     override fun onClick(v: View?) {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
     companion object {
@@ -897,7 +908,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
          * Conversion from screen rotation to JPEG orientation.
          */
         private val ORIENTATIONS = SparseIntArray()
-        private val FRAGMENT_DIALOG = "dialog"
+        private const val FRAGMENT_DIALOG = "dialog"
 
         init {
             ORIENTATIONS.append(Surface.ROTATION_0, 90)
@@ -939,12 +950,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
         /**
          * Max preview width that is guaranteed by Camera2 API
          */
-        private val MAX_PREVIEW_WIDTH = 320
+        private const val MAX_PREVIEW_WIDTH = 320
 
         /**
          * Max preview height that is guaranteed by Camera2 API
          */
-        private val MAX_PREVIEW_HEIGHT = 240
+        private const val MAX_PREVIEW_HEIGHT = 240
 
         /**
          * Given `choices` of `Size`s supported by a camera, choose the smallest one that
