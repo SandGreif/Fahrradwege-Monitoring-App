@@ -13,8 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package com.example.android.camera2basic
+package com.example.morro.fahrradwegemonitoringapp
 
 import android.content.Context
 import android.util.AttributeSet

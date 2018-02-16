@@ -37,6 +37,7 @@ import android.hardware.camera2.TotalCaptureResult
 import android.location.Location
 import android.media.Image
 import android.media.ImageReader
+import android.media.ImageReader.OnImageAvailableListener
 import android.os.*
 import android.support.v4.app.ActivityCompat
 import android.support.v4.app.Fragment
@@ -237,7 +238,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * This a callback object for the [ImageReader]. "onImageAvailable" will be called when a
      * still image is ready to be saved.
      */
-    private val onImageAvailableListener = ImageReader.OnImageAvailableListener {
+    private val onImageAvailableListener = OnImageAvailableListener {
         val image = it.acquireLatestImage()
         accelerometer.stopDataCollection()
         lastSavedPictureTime = time.getTime()
@@ -253,14 +254,13 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 saveFeatures(location)
                 saveImage(image)
                 speedLast = speed
-                if (imageCounter % 100 == 0) {
-                    getActivity().runOnUiThread(Runnable {
-                        run({
-                            speedTxt.setText("${speedLast}km/h / ${imageCounter} Bilder")
-                        })
+                if (imageCounter % 10 == 0) {
+                    activity.runOnUiThread(Runnable {
+                        run {
+                            speedTxt.text = "$speedLast km/h / $imageCounter Bilder"
+                        }
                     })
                 }
-             //   Thread.sleep(100)
               //  } else {
               //      image.close()
               //   }
@@ -433,7 +433,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         textureView = view.findViewById(R.id.texture)
         speedTxt = view.findViewById(R.id.speedTxt) as TextView
         val toggleButton = view.findViewById(R.id.toggleButtonStart) as ToggleButton
-        toggleButton.setOnCheckedChangeListener { button, isChecked ->
+        toggleButton.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
                 if(!takePictures())
                     toggleButton.toggle()
@@ -451,7 +451,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
         super.onActivityCreated(savedInstanceState)
         askForPermissionsExternalStorage()
         time = Time()
-        accelerometer = AccelerometerData(this.activity)
+        accelerometer = AccelerometerData()
+        accelerometer.init(this.activity)
         gpsLocation = GPSLocation(activity)
         startTime = time.getTime()
         gpsLocation.init()
@@ -957,12 +958,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
         /**
          * Max preview width that is guaranteed by Camera2 API
          */
-        private const val MAX_PREVIEW_WIDTH = 320
+        private  val MAX_PREVIEW_WIDTH = 640
 
         /**
          * Max preview height that is guaranteed by Camera2 API
          */
-        private const val MAX_PREVIEW_HEIGHT = 240
+        private  val MAX_PREVIEW_HEIGHT = 480
 
         /**
          * Given `choices` of `Size`s supported by a camera, choose the smallest one that

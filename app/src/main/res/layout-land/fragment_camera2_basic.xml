@@ -17,11 +17,11 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <com.example.android.camera2basic.AutoFitTextureView
+    <com.example.morro.fahrradwegemonitoringapp.AutoFitTextureView
         android:id="@+id/texture"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentStart="true"
+        android:layout_alignParentEnd="true"
         android:layout_alignParentTop="true" />
 
     <FrameLayout
@@ -34,7 +34,6 @@
         android:layout_toRightOf="@id/texture"
         android:background="#008B8B"
         android:orientation="horizontal">
-    </FrameLayout>
 
     <ToggleButton
         android:id="@+id/toggleButtonStart"
@@ -62,5 +61,7 @@
         android:textColor="?android:attr/colorBackground"
         android:textSize="24sp"
         android:textStyle="bold|italic" />
+
+    </FrameLayout>
 
 </RelativeLayout>

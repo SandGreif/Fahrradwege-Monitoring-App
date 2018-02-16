@@ -14,10 +14,9 @@ object Logger {
      */
     private var fileLog : File? = null
 
-    private lateinit var time : Time
+    private var time : Time = Time()
 
     init {
-        time = Time()
         fileLog = File(Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_PICTURES), "${time.getDay()}_Log.csv")
     }

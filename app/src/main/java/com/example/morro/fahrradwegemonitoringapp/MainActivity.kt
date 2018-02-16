@@ -2,7 +2,6 @@
 package com.example.morro.fahrradwegemonitoringapp
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
-import android.view.View
 
 
 class MainActivity : AppCompatActivity() {

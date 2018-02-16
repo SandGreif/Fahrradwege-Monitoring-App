@@ -65,7 +65,7 @@ class AccelerometerData : SensorEventListener {
 
     private var lock = ReentrantLock()
 
-    constructor(activity: Activity) {
+    fun init(activity: Activity) {
         // Datenwerte sollen aufgerunded werden auf 5 Kommastellen
         df.roundingMode = RoundingMode.CEILING
         this.activity = activity
@@ -91,53 +91,53 @@ class AccelerometerData : SensorEventListener {
         if (event != null && isDataGatheringActive) {
             lock.lock()
             try {
-            val sensorType = event.sensor.type
-            when (sensorType) {
-                Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
-                Sensor.TYPE_MAGNETIC_FIELD -> mMagnetometerData = event.values.clone()
-                else -> return
-            }
-            // Compute the rotation matrix: merges and translates the data
-            // from the accelerometer and magnetometer, in the device coordinate
-            // system, into a matrix in the world's coordinate system.
-            //
-            // The second argument is an inclination matrix, which isn't
-            // used in this example.
-            val rotationMatrix = FloatArray(9)
-            val rotationOK = SensorManager.getRotationMatrix(rotationMatrix,
-                    null, mAccelerometerData, mMagnetometerData)
+                val sensorType = event.sensor.type
+                when (sensorType) {
+                    Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
+                    Sensor.TYPE_MAGNETIC_FIELD -> mMagnetometerData = event.values.clone()
+                    else -> return
+                }
+                // Compute the rotation matrix: merges and translates the data
+                // from the accelerometer and magnetometer, in the device coordinate
+                // system, into a matrix in the world's coordinate system.
+                //
+                // The second argument is an inclination matrix, which isn't
+                // used in this example.
+                val rotationMatrix = FloatArray(9)
+                val rotationOK = SensorManager.getRotationMatrix(rotationMatrix,
+                        null, mAccelerometerData, mMagnetometerData)
 
-            // Remap the matrix based on current device/activity rotation.
-            var rotationMatrixAdjusted = FloatArray(9)
-            when (mDisplay?.rotation) {
-                Surface.ROTATION_0 -> rotationMatrixAdjusted = rotationMatrix.clone()
-                Surface.ROTATION_90 -> SensorManager.remapCoordinateSystem(rotationMatrix,
-                        SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X,
-                        rotationMatrixAdjusted)
-                Surface.ROTATION_180 -> SensorManager.remapCoordinateSystem(rotationMatrix,
-                        SensorManager.AXIS_MINUS_X, SensorManager.AXIS_MINUS_Y,
-                        rotationMatrixAdjusted)
-                Surface.ROTATION_270 -> SensorManager.remapCoordinateSystem(rotationMatrix,
-                        SensorManager.AXIS_MINUS_Y, SensorManager.AXIS_X,
-                        rotationMatrixAdjusted)
-            }
+                // Remap the matrix based on current device/activity rotation.
+                var rotationMatrixAdjusted = FloatArray(9)
+                when (mDisplay?.rotation) {
+                    Surface.ROTATION_0 -> rotationMatrixAdjusted = rotationMatrix.clone()
+                    Surface.ROTATION_90 -> SensorManager.remapCoordinateSystem(rotationMatrix,
+                            SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X,
+                            rotationMatrixAdjusted)
+                    Surface.ROTATION_180 -> SensorManager.remapCoordinateSystem(rotationMatrix,
+                            SensorManager.AXIS_MINUS_X, SensorManager.AXIS_MINUS_Y,
+                            rotationMatrixAdjusted)
+                    Surface.ROTATION_270 -> SensorManager.remapCoordinateSystem(rotationMatrix,
+                            SensorManager.AXIS_MINUS_Y, SensorManager.AXIS_X,
+                            rotationMatrixAdjusted)
+                }
 
-            // Get the orientation of the device (azimuth, pitch, roll) based
-            // on the rotation matrix. Output units are radians.
-            val orientationValues = FloatArray(3)
-            if (rotationOK) {
-                SensorManager.getOrientation(rotationMatrixAdjusted,
-                        orientationValues)
-            }
+                // Get the orientation of the device (azimuth, pitch, roll) based
+                // on the rotation matrix. Output units are radians.
+                val orientationValues = FloatArray(3)
+                if (rotationOK) {
+                    SensorManager.getOrientation(rotationMatrixAdjusted,
+                            orientationValues)
+                }
 
-            // Pull out the individual values from the array.
-            azimuthList?.add(orientationValues[0])
-            pitchList?.add(orientationValues[1])
-            rollList?.add(orientationValues[2])
-            xAxisList?.add(event.values[0])
-            yAxisList?.add(event.values[1])
-            zAxisList?.add(event.values[2])
-            samplesCounter++
+                // Pull out the individual values from the array.
+                azimuthList?.add(orientationValues[0])
+                pitchList?.add(orientationValues[1])
+                rollList?.add(orientationValues[2])
+                xAxisList?.add(event.values[0])
+                yAxisList?.add(event.values[1])
+                zAxisList?.add(event.values[2])
+                samplesCounter++
             } finally {
                 lock.unlock()
             }
@@ -152,7 +152,7 @@ class AccelerometerData : SensorEventListener {
     fun startDataCollection() {
         if(!isDataGatheringActive)
             samplesCounter = 0
-            isDataGatheringActive = true
+        isDataGatheringActive = true
     }
 
     /**
@@ -179,19 +179,19 @@ class AccelerometerData : SensorEventListener {
             lock.lock()
             try {
                 // Berechne Mittelwert, Variant und Standardabweichung
-                val meanX = calculateMean(xAxisList, samplesCounter)
-                val varianceX = calculateVariance(meanX, xAxisList, samplesCounter)
+                val meanX = calculateMean(xAxisList)
+                val varianceX = calculateVariance(meanX, xAxisList)
                 val standardDevX = calculateStandardDeviation(varianceX)
-                val meanY = calculateMean(yAxisList, samplesCounter)
-                val varianceY = calculateVariance(meanY, yAxisList, samplesCounter)
+                val meanY = calculateMean(yAxisList)
+                val varianceY = calculateVariance(meanY, yAxisList)
                 val standardDevY = calculateStandardDeviation(varianceY)
-                val meanZ = calculateMean(zAxisList, samplesCounter)
-                val varianceZ = calculateVariance(meanZ, zAxisList, samplesCounter)
+                val meanZ = calculateMean(zAxisList)
+                val varianceZ = calculateVariance(meanZ, zAxisList)
                 val standardDevZ = calculateStandardDeviation(varianceZ)
                 // Berechne Mittelwert für Gier-Nick-Roll
-                val meanAzimuth = calculateMean(azimuthList, samplesCounter)
-                val meanPitch = calculateMean(pitchList, samplesCounter)
-                val meanRoll = calculateMean(rollList, samplesCounter)
+                val meanAzimuth = calculateMean(azimuthList)
+                val meanPitch = calculateMean(pitchList)
+                val meanRoll = calculateMean(rollList)
                 // Representation der erfassten Daten als String. Kommas werden durch Punkte ersetzt.
                 return df.format(meanX).replace(',', '.') + "," + df.format(varianceX).replace(',', '.') + "," +
                         df.format(standardDevX).replace(',', '.') + "," + df.format(meanY).replace(',', '.') + "," +
@@ -200,7 +200,7 @@ class AccelerometerData : SensorEventListener {
                         df.format(standardDevZ).replace(',', '.') + "," + df.format(meanAzimuth).replace(',', '.') + "," +
                         df.format(meanPitch).replace(',', '.') + "," + df.format(meanRoll).replace(',', '.')
             } finally {
-              lock.unlock()
+                lock.unlock()
             }
         }
         return null
@@ -222,45 +222,55 @@ class AccelerometerData : SensorEventListener {
     }
 
     /**
-     * Berechnet den  Mittelwert über die Float Elemente einer Liste. Die Anzahl der Werte muss als
-     * Parameter numberOfSamples übergeben werden.
+     * Berechnet den  Mittelwert über die Float Elemente einer Liste.
      * Prec.:
      * Postc.: Der Mittelwert über die Float Elemente der übergebenen Liste,
-     * wenn samplesCounter ist größer 0
+     * wenn Anzahl der Elemente größer 0 ist
      */
-    fun calculateMean(list : MutableList<Float>?, numberOfSamples : Int) : Float {
+    fun calculateMean(list : MutableList<Float>?) : Float {
         var sum = 0f
-        if (numberOfSamples > 0) {
-            list?.forEach {
-                sum += it
+        val samples = list?.size
+        val result : Float
+        if (samples != null) {
+            if (samples > 0) {
+                list.forEach {
+                    sum += it
+                }
+                result =  sum / samples
+            } else {
+                result = 0f
             }
-            return sum / numberOfSamples
         } else {
-            return 0f
+            result = 0f
         }
+        return result
     }
 
     /**
      * Berechnet die Varianz. Dieser Funktion muss als Paramter der Mittelwert (mean) und die Liste mit
      * den Float Werten übergeben werden, um die Varianz zu berechnen. Als Varianz wird der Durchschnitt der quadrierten
-     * Differenzen zum Mittelwert bezeichnet. Die Anzahl der Werte muss als
-     * Parameter numberOfSamples übergeben werden.
+     * Differenzen zum Mittelwert bezeichnet.
      * Prec.:
-     * Postc.: Gibt die berechnete Variance als Float zurück oder 0 wenn samplesCounter <= 0
+     * Postc.: Gibt die berechnete Variance als Float zurück oder 0 wenn die Anzahl der Werte <= 0
      */
-    fun calculateVariance(mean : Float, list : MutableList<Float>?, numberOfSamples : Int) : Float {
-        var variance = 0f
+    fun calculateVariance(mean : Float, list : MutableList<Float>?) : Float {
         var sum = 0f
-        var tempDifference = 0f
-        if (samplesCounter > 0) {
-            list?.forEach {
-                tempDifference = (it-mean)
-                sum += tempDifference * tempDifference
-            }
-            return sum / numberOfSamples
-        } else {
-            return 0f
+        val samples = list?.size
+        var tempDifference : Float
+        val result : Float
+        if (samples != null) {
+            if (samples > 0) {
+                list.forEach {
+                    tempDifference = it-mean
+                    sum += tempDifference * tempDifference
+                }
+                result = sum / samples
+            } else {
+                result = 0f
+            }} else {
+            result = 0f
         }
+        return result
     }
 
     /**
@@ -270,6 +280,13 @@ class AccelerometerData : SensorEventListener {
      */
     fun calculateStandardDeviation(variance : Float) : Float{
         val x = abs(variance)
-        return sqrt(x)
+        var result : Float
+        var wasNegative = false
+        if(variance < 0.0)
+            wasNegative = true
+        result = sqrt(x)
+        if(wasNegative)
+            result *= -1
+        return result
     }
 }

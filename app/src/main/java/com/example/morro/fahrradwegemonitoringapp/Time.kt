@@ -1,6 +1,5 @@
 package com.example.morro.fahrradwegemonitoringapp
 
-import java.time.ZoneId
 import java.util.*
 
 /**
@@ -18,7 +17,6 @@ class Time {
      * Post.: return String in the date form "YEAR_MONTH_DAY_HOUR"
      */
     fun getDay(): String{
-        val calendar = Calendar.getInstance()
         val year = calendar.get(Calendar.YEAR)
         val month = calendar.get(Calendar.MONTH)
         val day = calendar.get(Calendar.DAY_OF_MONTH)
@@ -32,7 +30,7 @@ class Time {
      * Postc.: return ms since 1970
      */
     fun getTime(): Long{
-        return Date().getTime()
+        return Date().time
     }
 
 
