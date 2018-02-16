@@ -15,7 +15,7 @@
  * Quelle: Basic Camera2 example https://github.com/googlesamples/android-Camera2Basic/tree/master/kotlinApp
  */
 
-package com.example.morro.fahrradwegemonitoringapp
+package com.fahrradwegemonitoringapp
 
 import android.Manifest
 import android.content.Context
@@ -53,7 +53,6 @@ import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ToggleButton
-import com.example.android.camera2basic.*
 import java.io.File
 import java.util.*
 import java.util.Collections.max
@@ -257,7 +256,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 if (imageCounter % 10 == 0) {
                     activity.runOnUiThread(Runnable {
                         run {
-                            speedTxt.text = "$speedLast km/h / $imageCounter Bilder"
+                            speedTxt.text = "%f, %s, %d, %s".format(speedLast, "km/h /", imageCounter, "Bilder")
                         }
                     })
                 }
@@ -427,7 +426,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     override fun onCreateView(inflater: LayoutInflater,
             container: ViewGroup?,
             savedInstanceState: Bundle?
-    ): View? = inflater.inflate(R.layout.fragment_camera2_basic, container, false)
+    ): View? = inflater.inflate(R.layout.fragment_camera2_fma, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         textureView = view.findViewById(R.id.texture)
@@ -744,7 +743,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                         }
 
                         override fun onConfigureFailed(session: CameraCaptureSession) {
-                            activity.showToast("Failed")
+                            Toast.makeText(activity, "onConfigure Fehler", Toast.LENGTH_SHORT).show()
                         }
                     }, null)
         } catch (e: CameraAccessException) {
@@ -928,42 +927,42 @@ class CameraFragment : Fragment(), View.OnClickListener,
         /**
          * Tag for the [Log].
          */
-        private val TAG = "Camera2BasicFragment"
+        private const val TAG = "Camera2 FMA "
 
         /**
          * Camera state: Showing camera preview.
          */
-        private val STATE_PREVIEW = 0
+        private const val STATE_PREVIEW = 0
 
         /**
          * Camera state: Waiting for the focus to be locked.
          */
-        private val STATE_WAITING_LOCK = 1
+        private const val STATE_WAITING_LOCK = 1
 
         /**
          * Camera state: Waiting for the exposure to be precapture state.
          */
-        private val STATE_WAITING_PRECAPTURE = 2
+        private const val STATE_WAITING_PRECAPTURE = 2
 
         /**
          * Camera state: Waiting for the exposure state to be something other than precapture.
          */
-        private val STATE_WAITING_NON_PRECAPTURE = 3
+        private const val STATE_WAITING_NON_PRECAPTURE = 3
 
         /**
          * Camera state: Picture was taken.
          */
-        private val STATE_PICTURE_TAKEN = 4
+        private const val STATE_PICTURE_TAKEN = 4
 
         /**
          * Max preview width that is guaranteed by Camera2 API
          */
-        private  val MAX_PREVIEW_WIDTH = 640
+        private const val MAX_PREVIEW_WIDTH = 640
 
         /**
          * Max preview height that is guaranteed by Camera2 API
          */
-        private  val MAX_PREVIEW_HEIGHT = 480
+        private const val MAX_PREVIEW_HEIGHT = 480
 
         /**
          * Given `choices` of `Size`s supported by a camera, choose the smallest one that
@@ -996,26 +995,25 @@ class CameraFragment : Fragment(), View.OnClickListener,
             val notBigEnough = ArrayList<Size>()
             val w = aspectRatio.width
             val h = aspectRatio.height
-            for (option in choices) {
-                if (option.width <= maxWidth && option.height <= maxHeight &&
-                        option.height == option.width * h / w) {
-                    if (option.width >= textureViewWidth && option.height >= textureViewHeight) {
-                        bigEnough.add(option)
-                    } else {
-                        notBigEnough.add(option)
+            choices
+                    .filter { it.width <= maxWidth && it.height <= maxHeight && it.height == it.width * h / w }
+                    .forEach {
+                        if (it.width >= textureViewWidth && it.height >= textureViewHeight) {
+                            bigEnough.add(it)
+                        } else {
+                            notBigEnough.add(it)
+                        }
                     }
-                }
-            }
 
             // Pick the smallest of those big enough. If there is no one big enough, pick the
             // largest of those not big enough.
-            if (bigEnough.size > 0) {
-                return Collections.min(bigEnough, CompareSizesByArea())
-            } else if (notBigEnough.size > 0) {
-                return max(notBigEnough, CompareSizesByArea())
-            } else {
-                Log.e(TAG, "Couldn't find any suitable preview size")
-                return choices[0]
+            return when {
+                bigEnough.size > 0 -> Collections.min(bigEnough, CompareSizesByArea())
+                notBigEnough.size > 0 -> max(notBigEnough, CompareSizesByArea())
+                else -> {
+                    Log.e(TAG, "Couldn't find any suitable preview size")
+                    choices[0]
+                }
             }
         }
 

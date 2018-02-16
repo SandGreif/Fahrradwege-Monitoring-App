@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-package com.example.android.camera2basic
+package com.fahrradwegemonitoringapp
 
 import android.Manifest
 import android.app.AlertDialog
 import android.app.Dialog
 import android.os.Bundle
 import android.support.v4.app.DialogFragment
-import com.example.morro.fahrradwegemonitoringapp.R
 
 /**
  * Shows OK/Cancel confirmation dialog about camera permission.

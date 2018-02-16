@@ -1,5 +1,6 @@
 package com.example.morro.fahrradwegemonitoringapp
 
+import com.fahrradwegemonitoringapp.AccelerometerData
 import org.junit.Assert
 import org.junit.Test
 

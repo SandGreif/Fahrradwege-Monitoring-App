@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-package com.example.android.camera2basic
-
+package com.fahrradwegemonitoringapp
 import android.app.AlertDialog
 import android.app.Dialog
 import android.os.Bundle

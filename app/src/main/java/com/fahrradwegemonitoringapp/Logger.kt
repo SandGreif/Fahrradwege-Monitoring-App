@@ -1,5 +1,4 @@
-package com.example.morro.fahrradwegemonitoringapp
-
+package com.fahrradwegemonitoringapp
 import android.os.Environment
 import java.io.File
 

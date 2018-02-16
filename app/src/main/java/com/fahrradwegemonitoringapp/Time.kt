@@ -1,4 +1,4 @@
-package com.example.morro.fahrradwegemonitoringapp
+package com.fahrradwegemonitoringapp
 
 import java.util.*
 
