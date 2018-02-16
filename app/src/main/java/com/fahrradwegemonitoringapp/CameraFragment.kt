@@ -54,6 +54,8 @@ import android.widget.TextView
 import android.widget.Toast
 import android.widget.ToggleButton
 import java.io.File
+import java.math.RoundingMode
+import java.text.DecimalFormat
 import java.util.*
 import java.util.Collections.max
 import java.util.concurrent.Semaphore
@@ -134,7 +136,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     /**
      * Klassen Objekt um die Beschleunigungssensordaten zu erhalten
      */
-    private lateinit var accelerometer: AccelerometerData
+    private lateinit var accelerometer: MotionPositionSensorData
 
     /**
      * Klasse um  GPS Anfragen abzuhandeln
@@ -218,6 +220,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private var imageReader: ImageReader? = null
 
     /**
+     * Um Datenwerte aufzurunden auf 2 Kommastellen
+     */
+    private var  df = DecimalFormat("#.##")
+
+    /**
      * root directory path
      */
     private lateinit var letDirectory: File
@@ -253,10 +260,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 saveFeatures(location)
                 saveImage(image)
                 speedLast = speed
-                if (imageCounter % 10 == 0) {
-                    activity.runOnUiThread(Runnable {
+                if (imageCounter % 100 == 0) {
+                    activity.runOnUiThread({
                         run {
-                            speedTxt.text = "%f, %s, %d, %s".format(speedLast, "km/h /", imageCounter, "Bilder")
+                            speedTxt.text = "%s %s %d %s".format(df.format(speedLast), "km/h /", imageCounter, "Bilder")
                         }
                     })
                 }
@@ -296,7 +303,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
             val accelerometerString = accelerometer.getData()
             val captureTime = lastSavedPictureTime-startGetAccelerometerDataTime
             fileLocation.appendText("$lastSavedPictureTime,$latitudeAverage,$longitudeAverage," +
-                 "$speedBetweenCaptures,$accelerometerString,$captureTime,TAKINGPICTURES \n")
+                 "$speedBetweenCaptures,$accelerometerString,$captureTime \n")
             locationLastLatitude = location.latitude.toFloat()
             locationLastLongtitude =  location.longitude.toFloat()
     }
@@ -326,8 +333,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("features.csv"))
         fileLocation.appendText("Millisekunden,Breitengrad,Laengengrad,Geschwindigkeit," +
-                "MittelwertX,VarianzX,StandardabweichungX,MittelwertY,VarianzY,StandardabweichungY,MittelwertZ,VarianzZ,StandardabweichungZ," +
-                "Azimuth,Pitch,Roll,Aufnahmezeit \n")
+                "MittelWX,VarianzX,StandardAX,MittelWY,VarianzY,StandardAY,MittelWZ,VarianzZ,StandardAZ," +
+                "Azimuth,MittelWPitch,VarianzPitch,StandardAPitch,MittelWRoll,VarianzRoll,StandardRoll,Aufnahmezeit \n")
     }
 
     /**
@@ -449,8 +456,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
         askForPermissionsExternalStorage()
+        df.roundingMode = RoundingMode.CEILING
         time = Time()
-        accelerometer = AccelerometerData()
+        accelerometer = MotionPositionSensorData()
         accelerometer.init(this.activity)
         gpsLocation = GPSLocation(activity)
         startTime = time.getTime()

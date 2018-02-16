@@ -42,11 +42,12 @@
         android:id="@+id/speedTxt"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentStart="true"
-        android:layout_alignTop="@+id/toggleButtonStart"
-        android:layout_marginStart="295dp"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="82dp"
+        android:layout_marginEnd="16dp"
+        android:layout_toStartOf="@+id/toggleButtonStart"
         android:fontFamily="cursive"
-        android:text="             "
+        android:text="@string/speedTxt"
         android:textColor="?android:attr/colorBackground"
         android:textSize="24sp"
         android:textStyle="bold|italic" />
@@ -62,8 +63,8 @@
         android:layout_marginEnd="27dp"
         android:layout_marginTop="51dp"
         android:checked="false"
-        android:textOff="Starte Datenerfassung"
-        android:textOn="Stoppe Datenerfassung" />
+        android:textOff="@string/buttonStartTxt"
+        android:textOn="@string/buttonStopTxt" />
 
 
 </RelativeLayout>

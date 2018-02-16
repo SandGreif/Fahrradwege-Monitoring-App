@@ -23,7 +23,7 @@ import kotlin.math.sqrt
  * Von Julian Magierski am 13.02.2018 erstellt.
  */
 
-class AccelerometerData : SensorEventListener {
+class MotionPositionSensorData : SensorEventListener {
 
     private var mSensorManager: SensorManager? = null
     private var mAccelerometer: Sensor? = null
@@ -46,9 +46,16 @@ class AccelerometerData : SensorEventListener {
     private var mMagnetometerData = FloatArray(3)
 
     /**
+     * Alpha Wert fuer Tiefpassfilter um Gravity Wete aus den Beschleunigungssensordaten
+     * zu entfernen
+     */
+    private val alpha : Float = 0.8f
+    private var gravity = FloatArray(3)
+
+    /**
      * Um Datenwerte aufzurunden auf 5 Kommastellen
      */
-    private var  df = DecimalFormat("#.#####")
+    private var  df = DecimalFormat("#.###")
 
     /**
      * Boolean Variable die angibt ob Daten Samples gesammelt werden sollen
@@ -65,6 +72,11 @@ class AccelerometerData : SensorEventListener {
 
     private var lock = ReentrantLock()
 
+    /**
+     * Diese Methode muss aufgerufen werden, um die Sensor Listener zu starten
+     * Prec.: activity != null
+     * Postc.: Listener wurden initialisiert
+     */
     fun init(activity: Activity) {
         // Datenwerte sollen aufgerunded werden auf 5 Kommastellen
         df.roundingMode = RoundingMode.CEILING
@@ -130,13 +142,19 @@ class AccelerometerData : SensorEventListener {
                             orientationValues)
                 }
 
+                // Anwendung eines einfachen Tiefpassfilters, um den Gravitationsanteil
+                // aus den Beschleunigungssensordaten zu entfernen
+                gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0]
+                gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
+                gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
+
                 // Pull out the individual values from the array.
                 azimuthList?.add(orientationValues[0])
                 pitchList?.add(orientationValues[1])
                 rollList?.add(orientationValues[2])
-                xAxisList?.add(event.values[0])
-                yAxisList?.add(event.values[1])
-                zAxisList?.add(event.values[2])
+                xAxisList?.add(event.values[0] - gravity[0])
+                yAxisList?.add(event.values[0] - gravity[0])
+                zAxisList?.add(event.values[0] - gravity[0])
                 samplesCounter++
             } finally {
                 lock.unlock()
@@ -191,14 +209,20 @@ class AccelerometerData : SensorEventListener {
                 // Berechne Mittelwert für Gier-Nick-Roll
                 val meanAzimuth = calculateMean(azimuthList)
                 val meanPitch = calculateMean(pitchList)
+                val variancePitch = calculateVariance(meanPitch, pitchList)
+                val standardPitch = calculateStandardDeviation(variancePitch)
                 val meanRoll = calculateMean(rollList)
+                val varianceRoll = calculateVariance(meanRoll, rollList)
+                val standardRoll = calculateStandardDeviation(varianceRoll)
                 // Representation der erfassten Daten als String. Kommas werden durch Punkte ersetzt.
                 return df.format(meanX).replace(',', '.') + "," + df.format(varianceX).replace(',', '.') + "," +
                         df.format(standardDevX).replace(',', '.') + "," + df.format(meanY).replace(',', '.') + "," +
                         df.format(varianceY).replace(',', '.') + "," + df.format(standardDevY).replace(',', '.') + "," +
                         df.format(meanZ).replace(',', '.') + "," + df.format(varianceZ).replace(',', '.') + "," +
                         df.format(standardDevZ).replace(',', '.') + "," + df.format(meanAzimuth).replace(',', '.') + "," +
-                        df.format(meanPitch).replace(',', '.') + "," + df.format(meanRoll).replace(',', '.')
+                        df.format(meanPitch).replace(',', '.') + "," + df.format(variancePitch).replace(',', '.') +
+                        df.format(standardPitch).replace(',', '.') + "," + df.format(meanRoll).replace(',', '.') +
+                        df.format(varianceRoll).replace(',', '.') + "," + df.format(standardRoll).replace(',', '.')
             } finally {
                 lock.unlock()
             }

@@ -1,6 +1,5 @@
-package com.example.morro.fahrradwegemonitoringapp
+package com.fahrradwegemonitoringapp
 
-import com.fahrradwegemonitoringapp.AccelerometerData
 import org.junit.Assert
 import org.junit.Test
 
@@ -9,9 +8,9 @@ import org.junit.Test
  * Hierfür werden die Berechnungen getestet für den Mittelwert, Varianz und Standardabweichung
  * Created by morro on 15.02.2018.
  */
-class AccelerometerUnitTest {
+class MotionPositionSensorDataUnitTest {
 
-    private val accData : AccelerometerData = AccelerometerData()
+    private val mpSensorData : MotionPositionSensorData = MotionPositionSensorData()
 
     /**
      * Testet die Methode calculateMean mit einer Liste mit den Werten [2.0f, 2.0f]
@@ -20,7 +19,7 @@ class AccelerometerUnitTest {
     @Test
     fun calculateMean2() {
         val valuesList : MutableList<Float> = mutableListOf(2.0f, 2.0f)
-        val mean = accData.calculateMean(valuesList)
+        val mean = mpSensorData.calculateMean(valuesList)
         Assert.assertEquals(2.0f, mean)
     }
 
@@ -32,7 +31,7 @@ class AccelerometerUnitTest {
     @Test
     fun calculateMean5() {
         val valuesList : MutableList<Float> = mutableListOf(1.24f, 2.52f, 10.43f, 42.45f, 5.9f)
-        val mean = accData.calculateMean(valuesList)
+        val mean = mpSensorData.calculateMean(valuesList)
         Assert.assertEquals(12.508f, mean)
     }
 
@@ -43,7 +42,7 @@ class AccelerometerUnitTest {
     @Test
     fun calculateMean0() {
         val valuesList : MutableList<Float> = mutableListOf()
-        val mean = accData.calculateMean(valuesList)
+        val mean = mpSensorData.calculateMean(valuesList)
         Assert.assertEquals(0.0f, mean)
     }
 
@@ -54,7 +53,7 @@ class AccelerometerUnitTest {
     @Test
     fun calculateMeanNullList() {
         val valuesListNull: MutableList<Float>? = null
-        val mean = accData.calculateMean(valuesListNull)
+        val mean = mpSensorData.calculateMean(valuesListNull)
         Assert.assertEquals(0.0f, mean)
     }
 
@@ -66,8 +65,8 @@ class AccelerometerUnitTest {
     @Test
     fun calculateVariance2() {
         val valuesList : MutableList<Float> = mutableListOf(2.0f, 2.0f)
-        val mean = accData.calculateMean(valuesList)
-        val variance = accData.calculateVariance(mean, valuesList)
+        val mean = mpSensorData.calculateMean(valuesList)
+        val variance = mpSensorData.calculateVariance(mean, valuesList)
         Assert.assertEquals(0.0f, variance)
     }
 
@@ -80,8 +79,8 @@ class AccelerometerUnitTest {
     @Test
     fun calculatevariance5() {
         val valuesList : MutableList<Float> = mutableListOf(1.24f, 2.52f, 10.43f, 42.45f, 5.9f)
-        val mean = accData.calculateMean(valuesList)
-        val variance = accData.calculateVariance(mean, valuesList)
+        val mean = mpSensorData.calculateMean(valuesList)
+        val variance = mpSensorData.calculateVariance(mean, valuesList)
         Assert.assertEquals(234.24704f, variance)
     }
 
@@ -92,8 +91,8 @@ class AccelerometerUnitTest {
     @Test
     fun calculateVariance0() {
         val valuesList : MutableList<Float> = mutableListOf()
-        val mean = accData.calculateMean(valuesList)
-        val variance = accData.calculateVariance(mean, valuesList)
+        val mean = mpSensorData.calculateMean(valuesList)
+        val variance = mpSensorData.calculateVariance(mean, valuesList)
         Assert.assertEquals(0.0f, variance)
     }
 
@@ -104,8 +103,8 @@ class AccelerometerUnitTest {
     @Test
     fun calculateVarianceNullList() {
         val valuesListNull : MutableList<Float>? = mutableListOf()
-        val mean = accData.calculateMean(valuesListNull)
-        val variance = accData.calculateVariance(mean, valuesListNull)
+        val mean = mpSensorData.calculateMean(valuesListNull)
+        val variance = mpSensorData.calculateVariance(mean, valuesListNull)
         Assert.assertEquals(0.0f, variance)
     }
 
@@ -117,7 +116,7 @@ class AccelerometerUnitTest {
     fun calculateStandardDeviation0() {
         val standardDeviation : Float
         val x = 0.0f
-        standardDeviation = accData.calculateStandardDeviation(x)
+        standardDeviation = mpSensorData.calculateStandardDeviation(x)
         Assert.assertEquals(0.0f, standardDeviation)
     }
 
@@ -129,7 +128,7 @@ class AccelerometerUnitTest {
     fun calculateStandardDeviation3() {
         val standardDeviation : Float
         val x = 3.14f
-        standardDeviation = accData.calculateStandardDeviation(x)
+        standardDeviation = mpSensorData.calculateStandardDeviation(x)
         Assert.assertEquals(1.7720045f, standardDeviation)
     }
 
@@ -141,7 +140,7 @@ class AccelerometerUnitTest {
     fun calculateStandardDeviationNegative() {
         val standardDeviation : Float
         val x = -42f
-        standardDeviation = accData.calculateStandardDeviation(x)
+        standardDeviation = mpSensorData.calculateStandardDeviation(x)
         Assert.assertEquals(-6.4807405f, standardDeviation)
     }
 
