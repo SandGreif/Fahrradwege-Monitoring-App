@@ -7,7 +7,6 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
-import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.widget.Toast
 
@@ -18,7 +17,7 @@ import android.widget.Toast
  * Created by morro on 26.01.2018.
  */
 
-class GPSLocation(private val activity: Activity) {
+class GPSLocation(private val activity: Activity)  {
 
     private var location: Location? = null
 
@@ -28,15 +27,10 @@ class GPSLocation(private val activity: Activity) {
      */
     private var providerLastStatus = 0
 
+    /**
+     * Initialisiert die Klasse
+      */
     fun init() {
-        if (ContextCompat.checkSelfPermission(activity,
-                        Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-
-            ActivityCompat.requestPermissions(activity,
-                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                    1)
-        }
-
         val locationManager = activity.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val duration = Toast.LENGTH_LONG
 
@@ -84,9 +78,14 @@ class GPSLocation(private val activity: Activity) {
             }
         }
 
-        // Registriert den listener mit den Location Manager um Lokations Updates zu erhalten
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 200, 1f, locationListener)
+        if (ContextCompat.checkSelfPermission(activity,
+                        Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            // Registriert den listener mit den Location Manager um Lokations Updates zu erhalten
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 200, 1f, locationListener)
+        }
     }
+
 
     fun getLokation(): Location? {
         return location

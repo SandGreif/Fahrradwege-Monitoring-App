@@ -455,34 +455,45 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
-        askForPermissionsExternalStorage()
-        df.roundingMode = RoundingMode.CEILING
-        time = Time()
-        accelerometer = MotionPositionSensorData()
-        accelerometer.init(this.activity)
-        gpsLocation = GPSLocation(activity)
-        startTime = time.getTime()
-        gpsLocation.init()
-        letDirectory = File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_PICTURES), time.getDay())
-        if(!letDirectory.mkdirs())
+          df.roundingMode = RoundingMode.CEILING
+          time = Time()
+          accelerometer = MotionPositionSensorData()
+          accelerometer.init(this.activity)
+          startTime = time.getTime()
+          letDirectory = File(Environment.getExternalStoragePublicDirectory(
+                 Environment.DIRECTORY_PICTURES), time.getDay())
+          if(!letDirectory.mkdirs())
             closeCamera()
+    }
+
+    /**
+     * Fragt nach erlaubnis den GPS Sensor zu verwenden
+     */
+    private fun requestGPSPermission() {
+        if (ContextCompat.checkSelfPermission(activity,
+                        Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_ACCESS_FINE_LOCATION)
+        } else {
+            gpsLocation = GPSLocation(activity)
+            gpsLocation.init()
+        }
     }
 
     /**
      * Prec.: /
      * Postc.: Schreib und Lesezugriff für den Externen Speicher gegeben
      */
-    private fun askForPermissionsExternalStorage() {
+    private fun requestStorageReadWritePermission() {
         if (ContextCompat.checkSelfPermission(activity,
                         Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(activity,
-                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                    1)
-            ActivityCompat.requestPermissions(activity,
-                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
-                    1)
+            requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), REQUEST_WRITE_STORAGE_PERMISSION)
+        }
+        if (ContextCompat.checkSelfPermission(activity,
+                Manifest.permission.READ_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), REQUEST_READ_STORAGE_PERMISSION)
         }
     }
 
@@ -516,15 +527,21 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     override fun onRequestPermissionsResult(requestCode: Int,
-            permissions: Array<String>,
-            grantResults: IntArray) {
-        if (requestCode == REQUEST_CAMERA_PERMISSION) {
-            if (grantResults.size != 1 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                ErrorDialog.newInstance(getString(R.string.request_permission))
-                        .show(childFragmentManager, FRAGMENT_DIALOG)
+                                            permissions: Array<String>,
+                                            grantResults: IntArray) {
+        when (requestCode) {
+            REQUEST_CAMERA_PERMISSION -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+            REQUEST_WRITE_STORAGE_PERMISSION -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+            REQUEST_READ_STORAGE_PERMISSION -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+            REQUEST_ACCESS_FINE_LOCATION -> {
+                super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+                if(ContextCompat.checkSelfPermission(activity,
+                                Manifest.permission.ACCESS_FINE_LOCATION)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    gpsLocation = GPSLocation(activity)
+                    gpsLocation.init()
+                }
             }
-        } else {
-            super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         }
     }
 
@@ -642,6 +659,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Opens the camera specified by [CameraFragment.cameraId].
      */
     private fun openCamera(width: Int, height: Int) {
+        requestStorageReadWritePermission()
+        requestGPSPermission()
         val permission = ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA)
         if (permission != PackageManager.PERMISSION_GRANTED) {
             requestCameraPermission()
