@@ -68,8 +68,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         ActivityCompat.OnRequestPermissionsResultCallback {
 
     /**
-     * [TextureView.SurfaceTextureListener] handles several lifecycle events on a
-     * [TextureView].
+     * [TextureView.SurfaceTextureListener] Handler um [TextureView] Events zu verarbeiten
      */
     private val surfaceTextureListener = object : TextureView.SurfaceTextureListener {
 
@@ -183,7 +182,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private lateinit var time: Time
 
     /**
-     * [CameraDevice.StateCallback] is called when [CameraDevice] changes its state.
+     * [CameraDevice.StateCallback] wird aufgerufen wenn der Zustand von [CameraDevice] sich ändert
      */
     private val stateCallback = object : CameraDevice.StateCallback() {
 
@@ -194,12 +193,14 @@ class CameraFragment : Fragment(), View.OnClickListener,
         }
 
         override fun onDisconnected(cameraDevice: CameraDevice) {
+            Logger.writeToLogger("CameraFragment: stateCallback Display onError \n")
             cameraOpenCloseLock.release()
             cameraDevice.close()
             this@CameraFragment.cameraDevice = null
         }
 
         override fun onError(cameraDevice: CameraDevice, error: Int) {
+            Logger.writeToLogger("CameraFragment: stateCallback onError \n")
             onDisconnected(cameraDevice)
             this@CameraFragment.activity?.finish()
         }
@@ -476,6 +477,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     override fun onPause() {
+        Logger.writeToLogger("CameraFragment: onPause() wurde aufgerufen \n")
         closeCamera()
         stopBackgroundThread()
         super.onPause()
@@ -649,7 +651,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 }
             }
             else -> {
-                Log.e(TAG, "Display rotation is invalid: $displayRotation")
+                Logger.writeToLogger("CameraFragment: areDimensionsSwapped()  Display rotation ist ungültig \n")
+                Log.e(TAG, "Display rotation ist ungültig: $displayRotation")
             }
         }
         return swappedDimensions
@@ -663,21 +666,23 @@ class CameraFragment : Fragment(), View.OnClickListener,
         if (permission != PackageManager.PERMISSION_GRANTED) {
             requestPermissions()
             return
-    }
+        }
         requestPermissions()
         setUpCameraOutputs(width, height)
         configureTransform(width, height)
         val manager = activity.getSystemService(Context.CAMERA_SERVICE) as CameraManager
         try {
-            // Wait for camera to open - 2.5 seconds is sufficient
             if (!cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
+                Logger.writeToLogger("CameraFragment: openCamera()  cameraOpenCloseLock \n")
                 throw RuntimeException("Time out waiting to lock camera opening.")
             }
             if(ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
                 manager.openCamera(cameraId, stateCallback, backgroundHandler)
         } catch (e: CameraAccessException) {
+            Logger.writeToLogger("CameraFragment: openCamera()  keine CameraAccessException \n")
             Log.e(TAG, e.toString())
         } catch (e: InterruptedException) {
+            Logger.writeToLogger("CameraFragment: openCamera()  InterruptedException \n")
             throw RuntimeException("Interrupted while trying to lock camera opening.", e)
         }
 
@@ -688,6 +693,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     override fun onStop() {
         super.onStop()
+        Logger.writeToLogger("CameraFragment: onStop() wurde aufgerufen \n")
         closeCamera()
         motionPositionSensorData.onStop()
         gpsLocation?.onStop()
@@ -706,6 +712,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
             motionPositionSensorData.onStop()
             gpsLocation?.onStop()
         } catch (e: InterruptedException) {
+            Logger.writeToLogger("CameraFragment: closeCamera() InterruptedException\n")
             throw RuntimeException("Interrupted while trying to lock camera closing.", e)
         } finally {
             cameraOpenCloseLock.release()
@@ -730,6 +737,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
             backgroundThread = null
             backgroundHandler = null
         } catch (e: InterruptedException) {
+            Logger.writeToLogger("CameraFragment: stopBackgroundThread() InterruptedException\n")
             Log.e(TAG, e.toString())
         }
 
@@ -766,6 +774,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                                 captureSession?.setRepeatingRequest(previewRequest,
                                         captureCallback, backgroundHandler)
                             } catch (e: CameraAccessException) {
+                                Logger.writeToLogger("CameraFragment: createCameraPreviewSession() CameraAccessException\n")
                                 Log.e(TAG, e.toString())
                             }
 
@@ -773,9 +782,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
                         override fun onConfigureFailed(session: CameraCaptureSession) {
                             Toast.makeText(activity, "onConfigure Fehler", Toast.LENGTH_SHORT).show()
+                            Logger.writeToLogger("CameraFragment: createCameraPreviewSession() onConfigureFailed\n")
                         }
                     }, null)
         } catch (e: CameraAccessException) {
+            Logger.writeToLogger("CameraFragment: createCameraPreviewSession() CameraAccessException\n")
             Log.e(TAG, e.toString())
         }
 
@@ -816,12 +827,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
     /**
      * Erster Schritt um ein Bild aufzunehmen
-     * Lock the focus as the first step for a still image capture.
      */
     private fun lockFocus() {
         try {
-            // This is how to tell the camera to lock focus.
-            // Tell #captureCallback to wait for the lock.
             motionPositionSensorData.clearData()
             startGetAccelerometerDataTime = time.getTime()
             motionPositionSensorData.startDataCollection()
@@ -829,13 +837,13 @@ class CameraFragment : Fragment(), View.OnClickListener,
             captureSession?.capture(previewRequestBuilder.build(), captureCallback,
                     backgroundHandler)
         } catch (e: CameraAccessException) {
+            Logger.writeToLogger("CameraFragment: lockFocus() CameraAccessException\n")
             Log.e(TAG, e.toString())
         }
     }
 
     /**
-     * Run the precapture sequence for capturing a still image. This method should be called when
-     * we get a response in [.captureCallback] from [.lockFocus].
+     * Run the precapture sequence for capturing a still image.
      */
     private fun runPrecaptureSequence() {
         try {
@@ -847,21 +855,22 @@ class CameraFragment : Fragment(), View.OnClickListener,
             captureSession?.capture(previewRequestBuilder.build(), captureCallback,
                     backgroundHandler)
         } catch (e: CameraAccessException) {
+            Logger.writeToLogger("CameraFragment: runPrecaptureSequence() CameraAccessException\n")
             Log.e(TAG, e.toString())
         }
 
     }
 
     /**
-     * Capture a still picture. This method should be called when we get a response in
-     * [.captureCallback] from both [.lockFocus].
+     * Capture a still picture.
      */
     private fun captureStillPicture() {
         try {
-            if (activity == null || cameraDevice == null) return
+            if (activity == null || cameraDevice == null) {
+                Logger.writeToLogger("CameraFragment: captureStillPicture() activity == null || cameraDevice == null \n")
+                return
+            }
             val rotation = activity.windowManager.defaultDisplay.rotation
-
-            // This is the CaptureRequest.Builder that we use to take a picture.
             val captureBuilder = cameraDevice?.createCaptureRequest(
                     CameraDevice.TEMPLATE_STILL_CAPTURE)?.apply {
                 addTarget(imageReader?.surface)
@@ -884,7 +893,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 override fun onCaptureCompleted(session: CameraCaptureSession,
                         request: CaptureRequest,
                         result: TotalCaptureResult) {
-                    unlockFocus()
                 }
             }
 
@@ -894,26 +902,24 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 capture(captureBuilder?.build(), captureCallback, null)
             }
         } catch (e: CameraAccessException) {
+            Logger.writeToLogger("CameraFragment: captureStillPicture() CameraAccessException\n")
             Log.e(TAG, e.toString())
         }
-        // Nach der Aufnahme wird der Kamera Zustand aus preview gesetzt
+        // Nach der Aufnahme wird der Kamera Zustand auf preview gesetzt
         unlockFocus()
     }
 
     /**
-     * Unlock the focus. This method should be called when still image capture sequence is
+     * This method should be called when still image capture sequence is
      * finished.
      */
     private fun unlockFocus() {
         try {
-            // Reset the auto-focus trigger
-        //    captureSession?.capture(previewRequestBuilder.build(), captureCallback,
-            //        backgroundHandler)
-            // After this, the camera will go back to the normal state of preview.
             state = STATE_PREVIEW
             captureSession?.setRepeatingRequest(previewRequest, captureCallback,
                     backgroundHandler)
         } catch (e: CameraAccessException) {
+            Logger.writeToLogger("CameraFragment: unlockFocus() CameraAccessException \n")
             Log.e(TAG, e.toString())
         }
     }
@@ -1042,7 +1048,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 bigEnough.size > 0 -> Collections.min(bigEnough, CompareSizesByArea())
                 notBigEnough.size > 0 -> max(notBigEnough, CompareSizesByArea())
                 else -> {
-                    Log.e(TAG, "Couldn't find any suitable preview size")
+                    Logger.writeToLogger("CameraFragment: chooseOptimalSize()  keine passende preview groeße \n")
+                    Log.e(TAG, "Es konnte keine passende preview groeße gefunden werden")
                     choices[0]
                 }
             }
