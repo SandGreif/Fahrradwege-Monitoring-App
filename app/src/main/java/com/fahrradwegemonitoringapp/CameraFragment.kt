@@ -20,8 +20,6 @@ package com.fahrradwegemonitoringapp
 import android.Manifest
 import android.content.Context
 import android.content.DialogInterface
-import android.content.pm.ActivityInfo
-import android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.ImageFormat
@@ -252,7 +250,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val image = it.acquireLatestImage()
         accelerometer.stopDataCollection()
         lastSavedPictureTime = time.getTime()
-        val location = gpsLocation?.getLokation()
+        val location = gpsLocation?.getLocation()
         if (image != null) {
             if (location != null) {
                 speed = (location.speed * 60 * 60) / 1000 // in km/h
@@ -461,8 +459,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
         super.onActivityCreated(savedInstanceState)
         df.roundingMode = RoundingMode.CEILING
           time = Time()
-          accelerometer = MotionPositionSensorData()
-          accelerometer.init(this.activity)
           startTime = time.getTime()
           letDirectory = File(Environment.getExternalStoragePublicDirectory(
                  Environment.DIRECTORY_PICTURES), time.getDay())
@@ -506,6 +502,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
         } else {
             gpsLocation = GPSLocation(activity)
             gpsLocation?.init()
+            accelerometer = MotionPositionSensorData()
+            accelerometer.init(this.activity, gpsLocation!!)
         }
         if (permissionRequest.size > 0) {
                 var message = "Die Anwendung Fahrradwege Monitoring App benötigt Zugriff auf: " + permissionRequest[0]
@@ -544,6 +542,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     super.onRequestPermissionsResult(requestCode, permissions, grantResults)
                     gpsLocation = GPSLocation(activity)
                     gpsLocation?.init()
+                    accelerometer = MotionPositionSensorData()
+                    accelerometer.init(this.activity, gpsLocation!!)
                     return
                 }
             }
@@ -881,7 +881,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                         CaptureRequest.CONTROL_AF_MODE_OFF)
                 set(CaptureRequest.LENS_FOCUS_DISTANCE, 1.2f)
                 if (gpsLocation != null )
-                    set(CaptureRequest.JPEG_GPS_LOCATION, gpsLocation?.getLokation()
+                    set(CaptureRequest.JPEG_GPS_LOCATION, gpsLocation?.getLocation()
                 )
             }
             val captureCallback = object : CameraCaptureSession.CaptureCallback() {

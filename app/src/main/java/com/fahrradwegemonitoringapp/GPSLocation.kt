@@ -88,7 +88,7 @@ class GPSLocation(private val activity: Activity)  {
     }
 
 
-    fun getLokation(): Location? {
+    fun getLocation(): Location? {
         return location
     }
 }

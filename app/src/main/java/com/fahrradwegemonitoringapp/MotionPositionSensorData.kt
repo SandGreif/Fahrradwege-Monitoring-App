@@ -2,13 +2,11 @@ package com.fahrradwegemonitoringapp
 
 import android.app.Activity
 import android.content.Context
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
-import java.lang.Math.abs
+import android.hardware.*
 import java.math.RoundingMode
 import java.text.DecimalFormat
+import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.sqrt
 
 
@@ -59,17 +57,18 @@ class MotionPositionSensorData : SensorEventListener {
      */
     private var isDataGatheringActive: Boolean = false
 
-
+    private lateinit var location : GPSLocation
 
     /**
      * Diese Methode muss aufgerufen werden, um die Sensor Listener zu starten
      * Prec.: activity != null
      * Postc.: Listener wurden initialisiert
      */
-    fun init(activity: Activity) {
+    fun init(activity: Activity, location : GPSLocation) {
         // Datenwerte sollen aufgerunded werden auf 5 Kommastellen
         df.roundingMode = RoundingMode.CEILING
         this.activity = activity
+        this.location = location
         mSensorManager = activity.getSystemService(Context.SENSOR_SERVICE) as SensorManager?
         mAccelerometer = mSensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         mSensorManager?.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_FASTEST)
@@ -87,42 +86,49 @@ class MotionPositionSensorData : SensorEventListener {
     }
     override fun onSensorChanged(event: SensorEvent?) {
         if (event != null && isDataGatheringActive) {
-                val sensorType = event.sensor.type
-                when (sensorType) {
-                    Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
-                    Sensor.TYPE_MAGNETIC_FIELD -> mMagnetometerData = event.values.clone()
-                    else -> return
-                }
-                // Compute the rotation matrix: merges and translates the data
-                // from the accelerometer and magnetometer, in the device coordinate
-                // system, into a matrix in the world's coordinate system.
-                //
-                // The second argument is an inclination matrix, which isn't
-                // used in this example.
-                val rotationMatrix = FloatArray(9)
-                val rotationOK = SensorManager.getRotationMatrix(rotationMatrix,
-                        null, mAccelerometerData, mMagnetometerData)
-                // Get the orientation of the device (azimuth, pitch, roll) based
-                // on the rotation matrix. Output units are radians.
-                val orientationValues = FloatArray(3)
-                if (rotationOK) {
-                    SensorManager.getOrientation(rotationMatrix,
-                            orientationValues)
-                }
+            val sensorType = event.sensor.type
+            when (sensorType) {
+                Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
+                Sensor.TYPE_MAGNETIC_FIELD -> mMagnetometerData = event.values.clone()
+                else -> return
+            }
+            var azimuth : Float
+            val geoField : GeomagneticField
+            // Berechnet die Rotationsmatrix. Dabei werden die Beschleunigungssensordaten und
+            // Magnetsensordaten genutzt, um die Smartphone spezifischen Koordinaten auf die Welt Koordinaten
+            // zu transformieren
+            val rotationMatrix = FloatArray(9)
+            val rotationOK = SensorManager.getRotationMatrix(rotationMatrix,
+                    null, mAccelerometerData, mMagnetometerData)
+            // Gibt die Orientierung des Smartphones in der Gier-Nick-Roll Form zurück
+            val orientationValues = FloatArray(3)
+            if (rotationOK) {
+                SensorManager.getOrientation(rotationMatrix,
+                        orientationValues)
+            }
+            // Anwendung eines einfachen Tiefpassfilters, um den Gravitationsanteil
+            // aus den Beschleunigungssensordaten zu entfernen
+            gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0]
+            gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
+            gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
 
-                // Anwendung eines einfachen Tiefpassfilters, um den Gravitationsanteil
-                // aus den Beschleunigungssensordaten zu entfernen
-                gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0]
-                gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
-                gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
-
-                // Pull out the individual values from the array.
-                azimuthList?.add(orientationValues[0])
-                pitchList?.add(orientationValues[1])
-                rollList?.add(orientationValues[2])
-                xAxisList?.add(event.values[0] - gravity[0])
-                yAxisList?.add(event.values[1] - gravity[1])
-                zAxisList?.add(event.values[2] - gravity[2])
+            azimuth = orientationValues[0]
+            azimuth *= (180 / PI.toFloat())
+            if(location.getLocation() != null) {
+                // Wird benötigt um den magnetischen Norden in welche die Variable azimuth
+                // zeigt in den geografischen Norden zu konvertieren
+                geoField = GeomagneticField(location.getLocation()!!.latitude.toFloat(),
+                        location.getLocation()!!.longitude.toFloat(),
+                        location.getLocation()!!.altitude.toFloat(),
+                        System.currentTimeMillis())
+                azimuth += geoField.declination // Berechnet den magnetischen Norden zu den geografischen Norden
+            }
+            azimuthList?.add(azimuth)
+            pitchList?.add(orientationValues[1])
+            rollList?.add(orientationValues[2])
+            xAxisList?.add(event.values[0] - gravity[0])
+            yAxisList?.add(event.values[1] - gravity[1])
+            zAxisList?.add(event.values[2] - gravity[2])
         }
     }
 
@@ -176,7 +182,8 @@ class MotionPositionSensorData : SensorEventListener {
                 val varianceZ = calculateVariance(meanZ, zListFinish)
                 val standardDevZ = calculateStandardDeviation(varianceZ)
                 // Berechne Mittelwert für Gier-Nick-Roll
-                val meanAzimuth = calculateMean(azimuthListFinish)
+                var angelAzimuth = calculateAngelChangeAzimuth(azimuthListFinish)
+                angelAzimuth *= (PI.toFloat() / 180)
                 val meanPitch = calculateMean(pitchListFinish)
                 val variancePitch = calculateVariance(meanPitch, pitchListFinish)
                 val standardPitch = calculateStandardDeviation(variancePitch)
@@ -188,7 +195,7 @@ class MotionPositionSensorData : SensorEventListener {
                         df.format(standardDevX).replace(',', '.') + "," + df.format(meanY).replace(',', '.') + "," +
                         df.format(varianceY).replace(',', '.') + "," + df.format(standardDevY).replace(',', '.') + "," +
                         df.format(meanZ).replace(',', '.') + "," + df.format(varianceZ).replace(',', '.') + "," +
-                        df.format(standardDevZ).replace(',', '.') + "," + df.format(meanAzimuth).replace(',', '.') + "," +
+                        df.format(standardDevZ).replace(',', '.') + "," + df.format(angelAzimuth).replace(',', '.') + "," +
                         df.format(meanPitch).replace(',', '.') + "," + df.format(variancePitch).replace(',', '.') + "," +
                         df.format(standardPitch).replace(',', '.') + "," + df.format(meanRoll).replace(',', '.') + "," +
                         df.format(varianceRoll).replace(',', '.') + "," + df.format(standardRoll).replace(',', '.')
@@ -237,6 +244,25 @@ class MotionPositionSensorData : SensorEventListener {
     }
 
     /**
+     * Die Funktion berechnet die Winkeländerung zwischen den ersten Gier und den letzten Gierwinkel
+     * innerhalb einer als Paramter übergebenen Liste. Der zurückgegebene Winkel ist immer positiv und
+     * zeigt die relative änderung des Winkels.
+     * Prec.:
+     * Postc.: Winkdeländerung berechnet
+     */
+     fun calculateAngelChangeAzimuth(list : MutableList<Float>?) : Float {
+        var result = 0.0f
+        if(list?.isNotEmpty()!!) {
+            val firstAzimuth = list.first()
+            val lastAzimuth = list.last()
+            result = abs( firstAzimuth - lastAzimuth)
+            if(result > 180)
+                result = 360 - result
+        }
+        return result
+     }
+
+    /**
      * Berechnet die Varianz. Dieser Funktion muss als Paramter der Mittelwert (mean) und die Liste mit
      * den Float Werten übergeben werden, um die Varianz zu berechnen. Als Varianz wird der Durchschnitt der quadrierten
      * Differenzen zum Mittelwert bezeichnet.
@@ -279,4 +305,6 @@ class MotionPositionSensorData : SensorEventListener {
             result *= -1
         return result
     }
+
+
 }

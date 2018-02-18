@@ -144,5 +144,56 @@ class MotionPositionSensorDataUnitTest {
         Assert.assertEquals(-6.4807405f, standardDeviation)
     }
 
+    /**
+     *  Testet die Methode calculateAngelChangeAzimuth.
+     *  Als Ergebnis sollte der Winkel 0 Grad haben.
+     */
+    @Test
+    fun calculateAngelChangeAzimuthZero() {
+        var azimuthList : MutableList<Float> = mutableListOf(20.0f , 20.0f)
+        var result = mpSensorData.calculateAngelChangeAzimuth(azimuthList)
+        Assert.assertEquals(0.0f, result)
+        azimuthList.clear()
+        azimuthList = mutableListOf(-90.0f, -90.0f)
+        result = mpSensorData.calculateAngelChangeAzimuth(azimuthList)
+        Assert.assertEquals(0.0f, result)
+        azimuthList.clear()
+        azimuthList = mutableListOf(-90.0f, 42.0f , -90.0f)
+        result = mpSensorData.calculateAngelChangeAzimuth(azimuthList)
+        Assert.assertEquals(0.0f, result)
+    }
+
+    /**
+     * Testet den Aufruf der Methode calculateAngelChangeAzimuth mit eineer List die
+     * keine Elemente beinhaltet.
+     */
+    @Test
+    fun calculateAngelChangeAzimuthNoElements() {
+        var azimuthList : MutableList<Float> = mutableListOf()
+        var result = mpSensorData.calculateAngelChangeAzimuth(azimuthList)
+        Assert.assertEquals(0.0f, result)
+    }
+
+    /**
+     * Testet den Aufruf der Methode calculateAngelChangeAzimuth mit mehreren unterschiedlichen Wertem.
+     */
+    @Test
+    fun calculateAngelChangeAzimuthValues() {
+        var azimuthList : MutableList<Float> = mutableListOf(0.0f, 10.0f, 20.0f)
+        var result = mpSensorData.calculateAngelChangeAzimuth(azimuthList)
+        Assert.assertEquals(20.0f, result)
+        azimuthList.clear()
+        azimuthList = mutableListOf(90.0f, 42.0f , -45.0f)
+        result = mpSensorData.calculateAngelChangeAzimuth(azimuthList)
+        Assert.assertEquals(135.0f, result)
+        azimuthList.clear()
+        azimuthList = mutableListOf(10.0f, 42.0f , -45.0f)
+        result = mpSensorData.calculateAngelChangeAzimuth(azimuthList)
+        Assert.assertEquals(55.0f, result)
+        azimuthList.clear()
+        azimuthList = mutableListOf(90.0f, 10.0f, 42.0f , -45.0f, -145.0f)
+        result = mpSensorData.calculateAngelChangeAzimuth(azimuthList)
+        Assert.assertEquals(125.0f, result)
+    }
 
 }
