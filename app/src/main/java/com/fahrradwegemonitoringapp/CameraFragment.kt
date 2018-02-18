@@ -138,7 +138,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     /**
      * Klassen Objekt um die Beschleunigungssensordaten zu erhalten
      */
-    private lateinit var accelerometer: MotionPositionSensorData
+    private lateinit var motionPositionSensorData: MotionPositionSensorData
 
     /**
      * Klasse um  GPS Anfragen abzuhandeln
@@ -243,12 +243,13 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
 
     /**
-     * This a callback object for the [ImageReader]. "onImageAvailable" will be called when a
-     * still image is ready to be saved.
+     * Dies ist die callback Funktion für den [ImageReader]. Diese wurd aufgerufen, wenn ein Bild fertig ist
+     * zum abspeichern. Zu den Bild werden Features abgepeichert. Es wird für den Nutzer auch eine Text Ausgabe erstellt,
+     * um diesen die aktuelle Geschwindigkeit und die Anzahl der bereits aufgenommen Bilder mitzuteilen.
      */
     private val onImageAvailableListener = OnImageAvailableListener {
         val image = it.acquireLatestImage()
-        accelerometer.stopDataCollection()
+        motionPositionSensorData.stopDataCollection()
         lastSavedPictureTime = time.getTime()
         val location = gpsLocation?.getLocation()
         if (image != null) {
@@ -302,7 +303,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
             }
             val latitudeAverage = (location.latitude.toFloat() + locationLastLatitude) / 2
             val longitudeAverage = (location.longitude.toFloat() + locationLastLongtitude) / 2
-            val accelerometerString = accelerometer.getData()
+            val accelerometerString = motionPositionSensorData.getData()
             val captureTime = lastSavedPictureTime-startGetAccelerometerDataTime
             fileLocation.appendText("$lastSavedPictureTime,$latitudeAverage,$longitudeAverage," +
                  "$speedBetweenCaptures,$accelerometerString,$captureTime \n")
@@ -379,10 +380,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
         private fun process(result: CaptureResult) {
             when (state) {
-                STATE_PREVIEW -> Unit // Do nothing when the camera preview is working normally.
+                STATE_PREVIEW -> Unit
                 STATE_WAITING_LOCK -> capturePicture(result)
                 STATE_WAITING_PRECAPTURE -> {
-                    // CONTROL_AE_STATE can be null on some devices
                     val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
                     if (aeState == null ||
                             aeState == CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
@@ -390,7 +390,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     }
                 }
                 STATE_WAITING_NON_PRECAPTURE -> {
-                    // CONTROL_AE_STATE can be null on some devices
                     val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
                     if (aeState == null || aeState != CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
                         state = STATE_PICTURE_TAKEN
@@ -469,11 +468,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
     override fun onResume() {
         super.onResume()
         startBackgroundThread()
-
-        // When the screen is turned off and turned back on, the SurfaceTexture is already
-        // available, and "onSurfaceTextureAvailable" will not be called. In that case, we can open
-        // a camera and start preview from here (otherwise, we wait until the surface is ready in
-        // the SurfaceTextureListener).
         if (textureView.isAvailable) {
             openCamera(textureView.width, textureView.height)
         } else {
@@ -502,8 +496,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
         } else {
             gpsLocation = GPSLocation(activity)
             gpsLocation?.init()
-            accelerometer = MotionPositionSensorData()
-            accelerometer.init(this.activity, gpsLocation!!)
+            motionPositionSensorData = MotionPositionSensorData()
+            motionPositionSensorData.init(this.activity, gpsLocation!!)
         }
         if (permissionRequest.size > 0) {
                 var message = "Die Anwendung Fahrradwege Monitoring App benötigt Zugriff auf: " + permissionRequest[0]
@@ -542,8 +536,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     super.onRequestPermissionsResult(requestCode, permissions, grantResults)
                     gpsLocation = GPSLocation(activity)
                     gpsLocation?.init()
-                    accelerometer = MotionPositionSensorData()
-                    accelerometer.init(this.activity, gpsLocation!!)
+                    motionPositionSensorData = MotionPositionSensorData()
+                    motionPositionSensorData.init(this.activity, gpsLocation!!)
                     return
                 }
             }
@@ -690,8 +684,16 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Closes the current [CameraDevice].
+     * Wird aufgerufen wenn die App beendet wird
      */
+    override fun onStop() {
+        super.onStop()
+        closeCamera()
+        motionPositionSensorData.onStop()
+        gpsLocation?.onStop()
+    }
+
+
     private fun closeCamera() {
         try {
             cameraOpenCloseLock.acquire()
@@ -701,6 +703,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
             cameraDevice = null
             imageReader?.close()
             imageReader = null
+            motionPositionSensorData.onStop()
+            gpsLocation?.onStop()
         } catch (e: InterruptedException) {
             throw RuntimeException("Interrupted while trying to lock camera closing.", e)
         } finally {
@@ -738,20 +742,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
         try {
             val texture = textureView.surfaceTexture
 
-            // We configure the size of default buffer to be the size of camera preview we want.
             texture.setDefaultBufferSize(previewSize.width, previewSize.height)
-
-            // This is the output Surface we need to start preview.
             val surface = Surface(texture)
-
-            // We set up a CaptureRequest.Builder with the output Surface.
             previewRequestBuilder = cameraDevice!!.createCaptureRequest(
                     CameraDevice.TEMPLATE_PREVIEW
             )
             previewRequestBuilder.addTarget(surface)
-
-
-            // Here, we create a CameraCaptureSession for camera preview.
             cameraDevice?.createCaptureSession(Arrays.asList(surface, imageReader?.surface),
                     object : CameraCaptureSession.StateCallback() {
 
@@ -765,7 +761,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                                 // Auto focus should be continuous for camera preview.
                                previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
                                         CaptureRequest.CONTROL_AF_MODE_OFF)
-                                previewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 1.2f)
+                                previewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 0.22f)
                                 previewRequest = previewRequestBuilder.build()
                                 captureSession?.setRepeatingRequest(previewRequest,
                                         captureCallback, backgroundHandler)
@@ -826,9 +822,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
         try {
             // This is how to tell the camera to lock focus.
             // Tell #captureCallback to wait for the lock.
-            accelerometer.clearData()
+            motionPositionSensorData.clearData()
             startGetAccelerometerDataTime = time.getTime()
-            accelerometer.startDataCollection()
+            motionPositionSensorData.startDataCollection()
             state = STATE_WAITING_LOCK
             captureSession?.capture(previewRequestBuilder.build(), captureCallback,
                     backgroundHandler)
@@ -879,7 +875,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
                 set(CaptureRequest.CONTROL_AF_MODE,
                         CaptureRequest.CONTROL_AF_MODE_OFF)
-                set(CaptureRequest.LENS_FOCUS_DISTANCE, 1.2f)
+                set(CaptureRequest.LENS_FOCUS_DISTANCE, 0.22f)
                 if (gpsLocation != null )
                     set(CaptureRequest.JPEG_GPS_LOCATION, gpsLocation?.getLocation()
                 )

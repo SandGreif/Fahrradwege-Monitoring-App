@@ -21,6 +21,10 @@ class GPSLocation(private val activity: Activity)  {
 
     private var location: Location? = null
 
+    private lateinit var locationManager : LocationManager;
+
+    private lateinit var locationListener : LocationListener;
+
     /**
      * Wird benötigt um abzufragen ob  beim letzten Aufruf der callback Methode
      * onStatusChanged der Status 2 war
@@ -31,11 +35,11 @@ class GPSLocation(private val activity: Activity)  {
      * Initialisiert die Klasse
       */
     fun init() {
-        val locationManager = activity.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        locationManager = activity.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val duration = Toast.LENGTH_LONG
 
         // Definiert ein listener der auf Lokations Update reagiert
-        val locationListener = object : LocationListener {
+        locationListener = object : LocationListener {
             override fun onLocationChanged(locationListener: Location) {
                 // Wird aufgerufen wenn eine neue Lokation gefunden wurde von den Lokations Provider
                 location = locationListener
@@ -91,4 +95,12 @@ class GPSLocation(private val activity: Activity)  {
     fun getLocation(): Location? {
         return location
     }
+
+    /**
+     * Meldet die Listener ab. Sollte aufgerufen wenn die App geschlossen wird.
+     */
+    fun onStop() {
+        locationManager!!.removeUpdates(locationListener)
+    }
+
 }

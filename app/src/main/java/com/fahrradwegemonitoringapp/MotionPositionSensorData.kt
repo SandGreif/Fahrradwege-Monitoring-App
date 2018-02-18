@@ -84,6 +84,14 @@ class MotionPositionSensorData : SensorEventListener {
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
     }
+
+    /**
+     * Meldet die Listener ab. Sollte aufgerufen wenn die App geschlossen wird.
+     */
+    fun onStop() {
+        mSensorManager!!.unregisterListener(this)
+    }
+
     override fun onSensorChanged(event: SensorEvent?) {
         if (event != null && isDataGatheringActive) {
             val sensorType = event.sensor.type
