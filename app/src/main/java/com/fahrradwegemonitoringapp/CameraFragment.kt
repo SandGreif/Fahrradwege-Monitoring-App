@@ -19,6 +19,9 @@ package com.fahrradwegemonitoringapp
 
 import android.Manifest
 import android.content.Context
+import android.content.DialogInterface
+import android.content.pm.ActivityInfo
+import android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.ImageFormat
@@ -42,6 +45,7 @@ import android.os.*
 import android.support.v4.app.ActivityCompat
 import android.support.v4.app.Fragment
 import android.support.v4.content.ContextCompat
+import android.support.v7.app.AlertDialog
 import android.util.Log
 import android.util.Size
 import android.util.SparseIntArray
@@ -141,7 +145,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     /**
      * Klasse um  GPS Anfragen abzuhandeln
      */
-    private lateinit var gpsLocation: GPSLocation
+    private var gpsLocation: GPSLocation? = null
 
     private  var startTime: Long = 0
 
@@ -248,7 +252,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val image = it.acquireLatestImage()
         accelerometer.stopDataCollection()
         lastSavedPictureTime = time.getTime()
-        val location = gpsLocation.getLokation()
+        val location = gpsLocation?.getLokation()
         if (image != null) {
             if (location != null) {
                 speed = (location.speed * 60 * 60) / 1000 // in km/h
@@ -260,7 +264,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 saveFeatures(location)
                 saveImage(image)
                 speedLast = speed
-                if (imageCounter % 100 == 0) {
+                if (imageCounter % 10 == 0) {
                     activity.runOnUiThread({
                         run {
                             speedTxt.text = "%s %s %d %s".format(df.format(speedLast), "km/h /", imageCounter, "Bilder")
@@ -268,8 +272,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     })
                 }
               //  } else {
-              //      image.close()
-              //   }
+               //    image.close()
+               //  }
             } else {
                 Toast.makeText(activity, "Lokation war null", Toast.LENGTH_SHORT).show()
                 Logger.writeToLogger("Lokation war null \n")
@@ -455,7 +459,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
-          df.roundingMode = RoundingMode.CEILING
+        df.roundingMode = RoundingMode.CEILING
           time = Time()
           accelerometer = MotionPositionSensorData()
           accelerometer.init(this.activity)
@@ -464,37 +468,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
                  Environment.DIRECTORY_PICTURES), time.getDay())
           if(!letDirectory.mkdirs())
             closeCamera()
-    }
-
-    /**
-     * Fragt nach erlaubnis den GPS Sensor zu verwenden
-     */
-    private fun requestGPSPermission() {
-        if (ContextCompat.checkSelfPermission(activity,
-                        Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_ACCESS_FINE_LOCATION)
-        } else {
-            gpsLocation = GPSLocation(activity)
-            gpsLocation.init()
-        }
-    }
-
-    /**
-     * Prec.: /
-     * Postc.: Schreib und Lesezugriff für den Externen Speicher gegeben
-     */
-    private fun requestStorageReadWritePermission() {
-        if (ContextCompat.checkSelfPermission(activity,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), REQUEST_WRITE_STORAGE_PERMISSION)
-        }
-        if (ContextCompat.checkSelfPermission(activity,
-                Manifest.permission.READ_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), REQUEST_READ_STORAGE_PERMISSION)
-        }
     }
 
     override fun onResume() {
@@ -518,31 +491,64 @@ class CameraFragment : Fragment(), View.OnClickListener,
         super.onPause()
     }
 
-    private fun requestCameraPermission() {
-        if (shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
-            ConfirmationDialog().show(childFragmentManager, FRAGMENT_DIALOG)
+    /**
+     * Mit dieser Methode werden mehere Anfragen an den Nutzer gestellt, wenn die jeweilige Erlaubnis nicht gegeben ist,
+     * für den Zugriff auf Kamera, externer Schreibzugriff sowie GPS Sensor.
+     */
+    private fun requestPermissions() {
+        val permissionRequest: MutableList<String> = mutableListOf()
+        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
+            permissionRequest.add(Manifest.permission.CAMERA)
+        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
+            permissionRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            permissionRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
         } else {
-            requestPermissions(arrayOf(Manifest.permission.CAMERA), REQUEST_CAMERA_PERMISSION)
+            gpsLocation = GPSLocation(activity)
+            gpsLocation?.init()
         }
+        if (permissionRequest.size > 0) {
+                var message = "Die Anwendung Fahrradwege Monitoring App benötigt Zugriff auf: " + permissionRequest[0]
+                for (i in 1 until permissionRequest.size)
+                    message = message + ", " + permissionRequest[i]
+
+            showRequestMessage(message,
+                     DialogInterface.OnClickListener { _ , _ ->
+                          requestPermissions(permissionRequest.toTypedArray(),
+                                    REQUEST_MULTIPLE_PERMISSIONS)
+                        })
+                return
+            }
+    }
+
+    /**
+     * Fragt den Benutzer um Erlaubnis auf bestimmte Dienste des Smartphones zuzugreifen
+     */
+    private fun showRequestMessage(message: String, okListener: DialogInterface.OnClickListener) {
+        AlertDialog.Builder(activity)
+                .setMessage(message)
+                .setPositiveButton("OK", okListener)
+                .setNegativeButton("Cancel", null)
+                .create()
+                .show()
     }
 
     override fun onRequestPermissionsResult(requestCode: Int,
                                             permissions: Array<String>,
                                             grantResults: IntArray) {
-        when (requestCode) {
-            REQUEST_CAMERA_PERMISSION -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-            REQUEST_WRITE_STORAGE_PERMISSION -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-            REQUEST_READ_STORAGE_PERMISSION -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-            REQUEST_ACCESS_FINE_LOCATION -> {
-                super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-                if(ContextCompat.checkSelfPermission(activity,
-                                Manifest.permission.ACCESS_FINE_LOCATION)
-                        == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == REQUEST_MULTIPLE_PERMISSIONS) {
+            if (permissions.size == 3) {
+                if ((ContextCompat.checkSelfPermission(activity, permissions[0]) == grantResults[0]) &&
+                        (ContextCompat.checkSelfPermission(activity, permissions[1]) == grantResults[1]) &&
+                        (ContextCompat.checkSelfPermission(activity, permissions[2]) == grantResults[2])) {
+                    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
                     gpsLocation = GPSLocation(activity)
-                    gpsLocation.init()
+                    gpsLocation?.init()
+                    return
                 }
             }
         }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
     /**
@@ -659,13 +665,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Opens the camera specified by [CameraFragment.cameraId].
      */
     private fun openCamera(width: Int, height: Int) {
-        requestStorageReadWritePermission()
-        requestGPSPermission()
         val permission = ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA)
         if (permission != PackageManager.PERMISSION_GRANTED) {
-            requestCameraPermission()
+            requestPermissions()
             return
-        }
+    }
+        requestPermissions()
         setUpCameraOutputs(width, height)
         configureTransform(width, height)
         val manager = activity.getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -674,7 +679,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
             if (!cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
                 throw RuntimeException("Time out waiting to lock camera opening.")
             }
-            manager.openCamera(cameraId, stateCallback, backgroundHandler)
+            if(ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+                manager.openCamera(cameraId, stateCallback, backgroundHandler)
         } catch (e: CameraAccessException) {
             Log.e(TAG, e.toString())
         } catch (e: InterruptedException) {
@@ -874,7 +880,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 set(CaptureRequest.CONTROL_AF_MODE,
                         CaptureRequest.CONTROL_AF_MODE_OFF)
                 set(CaptureRequest.LENS_FOCUS_DISTANCE, 1.2f)
-                set(CaptureRequest.JPEG_GPS_LOCATION, gpsLocation.getLokation())
+                if (gpsLocation != null )
+                    set(CaptureRequest.JPEG_GPS_LOCATION, gpsLocation?.getLokation()
+                )
             }
             val captureCallback = object : CameraCaptureSession.CaptureCallback() {
                 override fun onCaptureCompleted(session: CameraCaptureSession,

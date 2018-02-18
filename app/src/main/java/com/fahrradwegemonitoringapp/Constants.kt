@@ -18,7 +18,4 @@
 
 package com.fahrradwegemonitoringapp
 
-const val REQUEST_CAMERA_PERMISSION = 1
-const val REQUEST_WRITE_STORAGE_PERMISSION = 2
-const val REQUEST_ACCESS_FINE_LOCATION = 3
-const val REQUEST_READ_STORAGE_PERMISSION = 4
+const val REQUEST_MULTIPLE_PERMISSIONS = 1

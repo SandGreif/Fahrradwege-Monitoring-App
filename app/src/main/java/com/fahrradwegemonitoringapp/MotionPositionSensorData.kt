@@ -5,13 +5,10 @@ import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
-import android.hardware.SensorManager import android.view.Display
-import android.view.Surface
-import android.view.WindowManager
+import android.hardware.SensorManager
 import java.lang.Math.abs
 import java.math.RoundingMode
 import java.text.DecimalFormat
-import java.util.concurrent.locks.ReentrantLock
 import kotlin.math.sqrt
 
 
@@ -62,15 +59,7 @@ class MotionPositionSensorData : SensorEventListener {
      */
     private var isDataGatheringActive: Boolean = false
 
-    // System display. Need this for determining rotation.
-    private var mDisplay: Display? = null
 
-    /**
-     * Zähler um due Anzahl der Daten Samples zu zählen
-     */
-    private var samplesCounter: Int = 0
-
-    private var lock = ReentrantLock()
 
     /**
      * Diese Methode muss aufgerufen werden, um die Sensor Listener zu starten
@@ -92,17 +81,12 @@ class MotionPositionSensorData : SensorEventListener {
         azimuthList = mutableListOf()
         pitchList = mutableListOf()
         rollList = mutableListOf()
-        // Get the display from the window manager (for rotation).
-        val wm = activity.getSystemService(Context.WINDOW_SERVICE) as WindowManager?
-        mDisplay = wm!!.defaultDisplay
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
     }
     override fun onSensorChanged(event: SensorEvent?) {
         if (event != null && isDataGatheringActive) {
-            lock.lock()
-            try {
                 val sensorType = event.sensor.type
                 when (sensorType) {
                     Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
@@ -118,27 +102,11 @@ class MotionPositionSensorData : SensorEventListener {
                 val rotationMatrix = FloatArray(9)
                 val rotationOK = SensorManager.getRotationMatrix(rotationMatrix,
                         null, mAccelerometerData, mMagnetometerData)
-
-                // Remap the matrix based on current device/activity rotation.
-                var rotationMatrixAdjusted = FloatArray(9)
-                when (mDisplay?.rotation) {
-                    Surface.ROTATION_0 -> rotationMatrixAdjusted = rotationMatrix.clone()
-                    Surface.ROTATION_90 -> SensorManager.remapCoordinateSystem(rotationMatrix,
-                            SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X,
-                            rotationMatrixAdjusted)
-                    Surface.ROTATION_180 -> SensorManager.remapCoordinateSystem(rotationMatrix,
-                            SensorManager.AXIS_MINUS_X, SensorManager.AXIS_MINUS_Y,
-                            rotationMatrixAdjusted)
-                    Surface.ROTATION_270 -> SensorManager.remapCoordinateSystem(rotationMatrix,
-                            SensorManager.AXIS_MINUS_Y, SensorManager.AXIS_X,
-                            rotationMatrixAdjusted)
-                }
-
                 // Get the orientation of the device (azimuth, pitch, roll) based
                 // on the rotation matrix. Output units are radians.
                 val orientationValues = FloatArray(3)
                 if (rotationOK) {
-                    SensorManager.getOrientation(rotationMatrixAdjusted,
+                    SensorManager.getOrientation(rotationMatrix,
                             orientationValues)
                 }
 
@@ -153,12 +121,8 @@ class MotionPositionSensorData : SensorEventListener {
                 pitchList?.add(orientationValues[1])
                 rollList?.add(orientationValues[2])
                 xAxisList?.add(event.values[0] - gravity[0])
-                yAxisList?.add(event.values[0] - gravity[0])
-                zAxisList?.add(event.values[0] - gravity[0])
-                samplesCounter++
-            } finally {
-                lock.unlock()
-            }
+                yAxisList?.add(event.values[1] - gravity[1])
+                zAxisList?.add(event.values[2] - gravity[2])
         }
     }
 
@@ -169,8 +133,7 @@ class MotionPositionSensorData : SensorEventListener {
      */
     fun startDataCollection() {
         if(!isDataGatheringActive)
-            samplesCounter = 0
-        isDataGatheringActive = true
+            isDataGatheringActive = true
     }
 
     /**
@@ -194,25 +157,31 @@ class MotionPositionSensorData : SensorEventListener {
     */
     fun getData() : String? {
         if(!isDataGatheringActive) {
-            lock.lock()
-            try {
+                // Über die Exemplarvariablen Listen kann nicht iterriert werden, weil in einem Thread
+                // über den Listener paralle auf diese zugegriffen wird. Deshalb werden die Listen kopiert
+                val xListFinish = xAxisList?.toMutableList()
+                val yListFinish = yAxisList?.toMutableList()
+                val zListFinish = zAxisList?.toMutableList()
+                val azimuthListFinish = azimuthList?.toMutableList()
+                val pitchListFinish = pitchList?.toMutableList()
+                val rollListFinish = rollList?.toMutableList()
                 // Berechne Mittelwert, Variant und Standardabweichung
-                val meanX = calculateMean(xAxisList)
-                val varianceX = calculateVariance(meanX, xAxisList)
+                val meanX = calculateMean(xListFinish)
+                val varianceX = calculateVariance(meanX, xListFinish)
                 val standardDevX = calculateStandardDeviation(varianceX)
-                val meanY = calculateMean(yAxisList)
-                val varianceY = calculateVariance(meanY, yAxisList)
+                val meanY = calculateMean(yListFinish)
+                val varianceY = calculateVariance(meanY, yListFinish)
                 val standardDevY = calculateStandardDeviation(varianceY)
-                val meanZ = calculateMean(zAxisList)
-                val varianceZ = calculateVariance(meanZ, zAxisList)
+                val meanZ = calculateMean(zListFinish)
+                val varianceZ = calculateVariance(meanZ, zListFinish)
                 val standardDevZ = calculateStandardDeviation(varianceZ)
                 // Berechne Mittelwert für Gier-Nick-Roll
-                val meanAzimuth = calculateMean(azimuthList)
-                val meanPitch = calculateMean(pitchList)
-                val variancePitch = calculateVariance(meanPitch, pitchList)
+                val meanAzimuth = calculateMean(azimuthListFinish)
+                val meanPitch = calculateMean(pitchListFinish)
+                val variancePitch = calculateVariance(meanPitch, pitchListFinish)
                 val standardPitch = calculateStandardDeviation(variancePitch)
-                val meanRoll = calculateMean(rollList)
-                val varianceRoll = calculateVariance(meanRoll, rollList)
+                val meanRoll = calculateMean(rollListFinish)
+                val varianceRoll = calculateVariance(meanRoll, rollListFinish)
                 val standardRoll = calculateStandardDeviation(varianceRoll)
                 // Representation der erfassten Daten als String. Kommas werden durch Punkte ersetzt.
                 return df.format(meanX).replace(',', '.') + "," + df.format(varianceX).replace(',', '.') + "," +
@@ -220,12 +189,9 @@ class MotionPositionSensorData : SensorEventListener {
                         df.format(varianceY).replace(',', '.') + "," + df.format(standardDevY).replace(',', '.') + "," +
                         df.format(meanZ).replace(',', '.') + "," + df.format(varianceZ).replace(',', '.') + "," +
                         df.format(standardDevZ).replace(',', '.') + "," + df.format(meanAzimuth).replace(',', '.') + "," +
-                        df.format(meanPitch).replace(',', '.') + "," + df.format(variancePitch).replace(',', '.') +
-                        df.format(standardPitch).replace(',', '.') + "," + df.format(meanRoll).replace(',', '.') +
+                        df.format(meanPitch).replace(',', '.') + "," + df.format(variancePitch).replace(',', '.') + "," +
+                        df.format(standardPitch).replace(',', '.') + "," + df.format(meanRoll).replace(',', '.') + "," +
                         df.format(varianceRoll).replace(',', '.') + "," + df.format(standardRoll).replace(',', '.')
-            } finally {
-                lock.unlock()
-            }
         }
         return null
     }

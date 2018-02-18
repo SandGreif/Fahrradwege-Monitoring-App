@@ -84,6 +84,7 @@ class GPSLocation(private val activity: Activity)  {
             // Registriert den listener mit den Location Manager um Lokations Updates zu erhalten
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 200, 1f, locationListener)
         }
+
     }
 
 
