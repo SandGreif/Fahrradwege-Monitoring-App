@@ -27,14 +27,7 @@ import android.graphics.Matrix
 import android.graphics.Point
 import android.graphics.RectF
 import android.graphics.SurfaceTexture
-import android.hardware.camera2.CameraAccessException
-import android.hardware.camera2.CameraCaptureSession
-import android.hardware.camera2.CameraCharacteristics
-import android.hardware.camera2.CameraDevice
-import android.hardware.camera2.CameraManager
-import android.hardware.camera2.CaptureRequest
-import android.hardware.camera2.CaptureResult
-import android.hardware.camera2.TotalCaptureResult
+import android.hardware.camera2.*
 import android.location.Location
 import android.media.Image
 import android.media.ImageReader
@@ -68,26 +61,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         ActivityCompat.OnRequestPermissionsResultCallback {
 
     /**
-     * [TextureView.SurfaceTextureListener] Handler um [TextureView] Events zu verarbeiten
-     */
-    private val surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-
-        override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
-            openCamera(width, height)
-        }
-
-        override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {
-            configureTransform(width, height)
-        }
-
-        override fun onSurfaceTextureDestroyed(texture: SurfaceTexture) = true
-
-        override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
-
-    }
-
-    /**
-     * ID of the current [CameraDevice].
+     * ID der Kamera [CameraDevice].
      */
     private lateinit var cameraId: String
 
@@ -110,12 +84,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     private var directoriesCounter : Int = 1
 
-    private val captureHeight: Int = 1920
+    private val captureHeight: Int = 1960
 
     private val captureWidth: Int = 1080
 
     /**
-     * An [AutoFitTextureView] for camera preview.
+     * An [AutoFitTextureView] Für die Kamera Preview.
      */
     private lateinit var textureView: AutoFitTextureView
 
@@ -125,12 +99,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private var captureSession: CameraCaptureSession? = null
 
     /**
-     * A reference to the opened [CameraDevice].
+     * Hält Referenz zu der geöffneten Kamera [CameraDevice].
      */
     private var cameraDevice: CameraDevice? = null
 
     /**
-     * The [android.util.Size] of camera preview.
+     * Die Bildgröße [android.util.Size] der Preview
      */
     private lateinit var previewSize: Size
 
@@ -162,24 +136,141 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private var locationLastLongtitude: Float = 0.0f
 
     /**
-     * actual speed  in km/h
+     * Aktuelle Geschwindigkeit in km/h
      */
     private var speed: Float = 0.0f
 
     /**
-     * last speed measured related to the last captured image in km/h
+     * Die vorherige gemessene Geschwindigkeit
      */
     private var speedLast: Float = 0.0f
 
     /**
-     * Speed in km/h betwenn two captured images
+     * Geschwindikeit in km/h zwischen zwei Aufnahmen
      */
     private var speedBetweenCaptures: Float = 0.0f
 
     /**
-     * Time relatet class object
+     * Klasse um die aktuelle Zeit und Datum zu erhalten
      */
     private lateinit var time: Time
+
+    /**
+     * An additional thread for running tasks that shouldn't block the UI.
+     */
+    private var backgroundThread: HandlerThread? = null
+
+    /**
+     * A [Handler] for running tasks in the background.
+     */
+    private var backgroundHandler: Handler? = null
+
+    /**
+     * Ein [ImageReader] welcher aufgenommene Bilder abhandelt
+     */
+    private var imageReader: ImageReader? = null
+
+    /**
+     * Um Datenwerte aufzurunden auf 2 Kommastellen
+     */
+    private var  df = DecimalFormat("#.##")
+
+    /**
+     * Wurzelverzeichnis um Dateien abzuspeichern
+     */
+    private lateinit var letDirectory: File
+
+    /**
+     * Das aktuell verwendete Verzeichnis
+     */
+    private lateinit var actualDirectory: File
+
+    /**
+     * Referenz auf Datei um Features abzuspeichern
+     *  */
+    private lateinit var fileLocation: File
+
+    /**
+     * [CaptureRequest.Builder] Für die Kamera Preview
+     */
+    private lateinit var previewRequestBuilder: CaptureRequest.Builder
+
+    /**
+     * [CaptureRequest] generiert von by [.previewRequestBuilder]
+     */
+    private lateinit var previewRequest: CaptureRequest
+
+    /**
+     * Der aktuelle Zustand um Bilder aufzunehmen.
+     * Der Anfangszustandand ist Preview. In welchem für die Preview Bilder aufgenommen werden
+     *
+     * @see .captureCallback
+     */
+    private var state = STATE_PREVIEW
+
+    /**
+     * [Semaphore] Wird benötigt um die Anwendung daran zu hindern die App zu schließen ohne die Kamera vorher zu schließen
+     */
+    private val cameraOpenCloseLock = Semaphore(1)
+
+    /**
+     * Lage des Kamerasensors
+     */
+    private var sensorOrientation = 0
+
+
+    /**
+     * Die [CameraCaptureSession.CaptureCallback] welche Events abarbeitet für die Aufnahme eines Bildes
+     */
+    private val captureCallback = object : CameraCaptureSession.CaptureCallback() {
+
+        private fun process(result: CaptureResult) {
+            when (state) {
+                STATE_PREVIEW -> Unit
+                STATE_WAITING_LOCK -> capturePicture(result)
+                STATE_WAITING_PRECAPTURE -> {
+                    val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
+                    if (aeState == null ||
+                            aeState == CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
+                        state = STATE_WAITING_NON_PRECAPTURE
+                        Logger.writeToLogger("CameraFragment: captureCallback() STATE_WAITING_NON_PRECAPTURE \n")
+                    } else {
+                        runPrecaptureSequence()
+                    }
+                }
+                STATE_WAITING_NON_PRECAPTURE -> {
+                    val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
+                    if (aeState == null || aeState != CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
+                        state = STATE_PICTURE_TAKEN
+                        Logger.writeToLogger("CameraFragment: captureCallback() STATE_PICTURE_TAKEN \n")
+                        captureStillPicture()
+                    }
+                }
+            }
+        }
+
+        private fun capturePicture(result: CaptureResult) {
+            val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
+            if (aeState == null || aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
+                state = STATE_PICTURE_TAKEN
+                captureStillPicture()
+            } else {
+                runPrecaptureSequence()
+            }
+        }
+
+        override fun onCaptureProgressed(session: CameraCaptureSession,
+                                         request: CaptureRequest,
+                                         partialResult: CaptureResult) {
+            process(partialResult)
+        }
+
+        override fun onCaptureCompleted(session: CameraCaptureSession,
+                                        request: CaptureRequest,
+                                        result: TotalCaptureResult) {
+            process(result)
+        }
+    }
 
     /**
      * [CameraDevice.StateCallback] wird aufgerufen wenn der Zustand von [CameraDevice] sich ändert
@@ -208,40 +299,21 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * An additional thread for running tasks that shouldn't block the UI.
+     * [TextureView.SurfaceTextureListener] Handler um [TextureView] Events zu verarbeiten
      */
-    private var backgroundThread: HandlerThread? = null
+    private val surfaceTextureListener = object : TextureView.SurfaceTextureListener {
 
-    /**
-     * A [Handler] for running tasks in the background.
-     */
-    private var backgroundHandler: Handler? = null
+        override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
+            openCamera(width, height)
+        }
 
-    /**
-     * An [ImageReader] that handles still image capture.
-     */
-    private var imageReader: ImageReader? = null
+        override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {
+            configureTransform(width, height)
+        }
 
-    /**
-     * Um Datenwerte aufzurunden auf 2 Kommastellen
-     */
-    private var  df = DecimalFormat("#.##")
-
-    /**
-     * root directory path
-     */
-    private lateinit var letDirectory: File
-
-    /**
-     * actual directory path
-     */
-    private lateinit var actualDirectory: File
-
-    /**
-     * File to write GPS ccordinates
-     */
-    private lateinit var fileLocation: File
-
+        override fun onSurfaceTextureDestroyed(texture: SurfaceTexture) = true
+        override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
+    }
 
     /**
      * Dies ist die callback Funktion für den [ImageReader]. Diese wurd aufgerufen, wenn ein Bild fertig ist
@@ -250,8 +322,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     private val onImageAvailableListener = OnImageAvailableListener {
         val image = it.acquireLatestImage()
-        motionPositionSensorData.stopDataCollection()
-        lastSavedPictureTime = time.getTime()
         val location = gpsLocation?.getLocation()
         if (image != null) {
             if (location != null) {
@@ -288,8 +358,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Post.: Bild ist abgespeichert
      */
     private fun saveImage(image: Image) {
-            ImageSaver().saveImage(image, File(actualDirectory, ( "$lastSavedPictureTime" + ".jpg")))
-            imageCounter++
+        ImageSaver().saveImage(image, File(actualDirectory, ( "$lastSavedPictureTime" + ".jpg")))
+        imageCounter++
     }
 
     /**
@@ -298,18 +368,18 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Postc.: Features wurden in eine Datei geschrieben
      */
     private fun saveFeatures(location : Location) {
-            if(imageCounter == 0) {
-                locationLastLatitude = location.latitude.toFloat()
-                locationLastLongtitude =  location.longitude.toFloat()
-            }
-            val latitudeAverage = (location.latitude.toFloat() + locationLastLatitude) / 2
-            val longitudeAverage = (location.longitude.toFloat() + locationLastLongtitude) / 2
-            val accelerometerString = motionPositionSensorData.getData()
-            val captureTime = lastSavedPictureTime-startGetAccelerometerDataTime
-            fileLocation.appendText("$lastSavedPictureTime,$latitudeAverage,$longitudeAverage," +
-                 "$speedBetweenCaptures,$accelerometerString,$captureTime \n")
+        if(imageCounter == 0) {
             locationLastLatitude = location.latitude.toFloat()
             locationLastLongtitude =  location.longitude.toFloat()
+        }
+        val latitudeAverage = (location.latitude.toFloat() + locationLastLatitude) / 2
+        val longitudeAverage = (location.longitude.toFloat() + locationLastLongtitude) / 2
+        val accelerometerString = motionPositionSensorData.getData()
+        val captureTime = lastSavedPictureTime-startGetAccelerometerDataTime
+        fileLocation.appendText("$lastSavedPictureTime,$latitudeAverage,$longitudeAverage," +
+                "$speedBetweenCaptures,$accelerometerString,$captureTime \n")
+        locationLastLatitude = location.latitude.toFloat()
+        locationLastLongtitude =  location.longitude.toFloat()
     }
 
     /**
@@ -339,97 +409,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
         fileLocation.appendText("Millisekunden,Breitengrad,Laengengrad,Geschwindigkeit," +
                 "MittelWX,VarianzX,StandardAX,MittelWY,VarianzY,StandardAY,MittelWZ,VarianzZ,StandardAZ," +
                 "Azimuth,MittelWPitch,VarianzPitch,StandardAPitch,MittelWRoll,VarianzRoll,StandardRoll,Aufnahmezeit \n")
-    }
-
-    /**
-     * [CaptureRequest.Builder] for the camera preview
-     */
-    private lateinit var previewRequestBuilder: CaptureRequest.Builder
-
-    /**
-     * [CaptureRequest] generated by [.previewRequestBuilder]
-     */
-    private lateinit var previewRequest: CaptureRequest
-
-    /**
-     * The current state of camera state for taking pictures.
-     *
-     * @see .captureCallback
-     */
-    private var state = STATE_PREVIEW
-
-    /**
-     * A [Semaphore] to prevent the app from exiting before closing the camera.
-     */
-    private val cameraOpenCloseLock = Semaphore(1)
-
-    /**
-     * Whether the current camera device supports Flash or not.
-     */
-    private var flashSupported = false
-
-    /**
-     * Orientation of the camera sensor
-     */
-    private var sensorOrientation = 0
-
-
-    /**
-     * A [CameraCaptureSession.CaptureCallback] that handles events related to JPEG capture.
-     */
-    private val captureCallback = object : CameraCaptureSession.CaptureCallback() {
-
-        private fun process(result: CaptureResult) {
-            when (state) {
-                STATE_PREVIEW -> Unit
-                STATE_WAITING_LOCK -> capturePicture(result)
-                STATE_WAITING_PRECAPTURE -> {
-                    val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
-                    if (aeState == null ||
-                            aeState == CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
-                        state = STATE_WAITING_NON_PRECAPTURE
-                    }
-                }
-                STATE_WAITING_NON_PRECAPTURE -> {
-                    val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
-                    if (aeState == null || aeState != CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
-                        state = STATE_PICTURE_TAKEN
-                        captureStillPicture()
-                    }
-                }
-            }
-        }
-
-        private fun capturePicture(result: CaptureResult) {
-            val afState = result.get(CaptureResult.CONTROL_AF_STATE)
-            if (afState == null) {
-                captureStillPicture()
-            } else if (afState == CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED
-                    || afState == CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED) {
-                // CONTROL_AE_STATE can be null on some devices
-                val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
-                if (aeState == null || aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
-                    state = STATE_PICTURE_TAKEN
-                    captureStillPicture()
-                } else {
-                    runPrecaptureSequence()
-                }
-            }
-        }
-
-        override fun onCaptureProgressed(session: CameraCaptureSession,
-                request: CaptureRequest,
-                partialResult: CaptureResult) {
-            process(partialResult)
-        }
-
-        override fun onCaptureCompleted(session: CameraCaptureSession,
-                request: CaptureRequest,
-                result: TotalCaptureResult) {
-            process(result)
-
-        }
-
     }
 
     override fun onCreateView(inflater: LayoutInflater,
@@ -477,7 +456,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     override fun onPause() {
-        Logger.writeToLogger("CameraFragment: onPause() wurde aufgerufen \n")
+        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
+            Logger.writeToLogger("CameraFragment: onPause() wurde aufgerufen \n")
         closeCamera()
         stopBackgroundThread()
         super.onPause()
@@ -548,23 +528,22 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Sets up member variables related to camera.
+     * Hier werden die Exemplarvariablen initialisiert die von der Kamera API verwendet werden
      *
-     * @param width  The width of available size for camera preview
-     * @param height The height of available size for camera preview
+     * @param width  Die breite der Kamera Preview
+     * @param height Höhe der Kamera Preview
      */
     private fun setUpCameraOutputs(width: Int, height: Int) {
         val manager = activity.getSystemService(Context.CAMERA_SERVICE) as CameraManager
         try {
             for (cameraId in manager.cameraIdList) {
                 val characteristics = manager.getCameraCharacteristics(cameraId)
-                // We don't use a front facing camera in this sample.
+                // In dieser Anwendung wird nicht die vorder Kamera verwendet
                 val cameraDirection = characteristics.get(CameraCharacteristics.LENS_FACING)
                 if (cameraDirection != null &&
                         cameraDirection == CameraCharacteristics.LENS_FACING_FRONT) {
                     continue
                 }
-
                 val map = characteristics.get(
                         CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: continue
 
@@ -608,15 +587,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 } else {
                     textureView.setAspectRatio(previewSize.height, previewSize.width)
                 }
-
-                // Check if the flash is supported.
-                flashSupported =
-                        characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
-
                 this.cameraId = cameraId
-
-                // We've found a viable camera and finished setting up member variables,
-                // so we don't need to iterate through other available cameras.
                 return
             }
         } catch (e: CameraAccessException) {
@@ -659,15 +630,14 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Opens the camera specified by [CameraFragment.cameraId].
+     * Öffnet die Kamera [CameraFragment.cameraId].
      */
     private fun openCamera(width: Int, height: Int) {
         val permission = ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA)
+        requestPermissions()
         if (permission != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions()
             return
         }
-        requestPermissions()
         setUpCameraOutputs(width, height)
         configureTransform(width, height)
         val manager = activity.getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -688,9 +658,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
     }
 
-    /**
-     * Wird aufgerufen wenn die App beendet wird
-     */
     override fun onStop() {
         super.onStop()
         Logger.writeToLogger("CameraFragment: onStop() wurde aufgerufen \n")
@@ -709,8 +676,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
             cameraDevice = null
             imageReader?.close()
             imageReader = null
-            motionPositionSensorData.onStop()
-            gpsLocation?.onStop()
         } catch (e: InterruptedException) {
             Logger.writeToLogger("CameraFragment: closeCamera() InterruptedException\n")
             throw RuntimeException("Interrupted while trying to lock camera closing.", e)
@@ -744,7 +709,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Creates a new [CameraCaptureSession] for camera preview.
+     * Wenn die Kamera geöffnet wurde wird eine [CameraCaptureSession] gestartet. Dabei wird für
+     * die Preview kontinuierlich Bilder aufgenommen.
      */
     private fun createCameraPreviewSession() {
         try {
@@ -760,16 +726,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     object : CameraCaptureSession.StateCallback() {
 
                         override fun onConfigured(cameraCaptureSession: CameraCaptureSession) {
-                            // The camera is already closed
                             if (cameraDevice == null) return
-
-                            // When the session is ready, we start displaying the preview.
                             captureSession = cameraCaptureSession
                             try {
-                                // Auto focus should be continuous for camera preview.
                                previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
                                         CaptureRequest.CONTROL_AF_MODE_OFF)
-                                previewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 0.22f)
+                                previewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 0.32f)
                                 previewRequest = previewRequestBuilder.build()
                                 captureSession?.setRepeatingRequest(previewRequest,
                                         captureCallback, backgroundHandler)
@@ -777,9 +739,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                                 Logger.writeToLogger("CameraFragment: createCameraPreviewSession() CameraAccessException\n")
                                 Log.e(TAG, e.toString())
                             }
-
                         }
-
                         override fun onConfigureFailed(session: CameraCaptureSession) {
                             Toast.makeText(activity, "onConfigure Fehler", Toast.LENGTH_SHORT).show()
                             Logger.writeToLogger("CameraFragment: createCameraPreviewSession() onConfigureFailed\n")
@@ -789,7 +749,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
             Logger.writeToLogger("CameraFragment: createCameraPreviewSession() CameraAccessException\n")
             Log.e(TAG, e.toString())
         }
-
     }
 
     /**
@@ -830,14 +789,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     private fun lockFocus() {
         try {
-            motionPositionSensorData.clearData()
-            startGetAccelerometerDataTime = time.getTime()
-            motionPositionSensorData.startDataCollection()
             state = STATE_WAITING_LOCK
             captureSession?.capture(previewRequestBuilder.build(), captureCallback,
                     backgroundHandler)
         } catch (e: CameraAccessException) {
-            Logger.writeToLogger("CameraFragment: lockFocus() CameraAccessException\n")
+            Logger.writeToLogger("CameraFragment: lockFocus() CameraAccessException \n")
             Log.e(TAG, e.toString())
         }
     }
@@ -870,6 +826,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 Logger.writeToLogger("CameraFragment: captureStillPicture() activity == null || cameraDevice == null \n")
                 return
             }
+            var requestTimestamp : Long = 0
             val rotation = activity.windowManager.defaultDisplay.rotation
             val captureBuilder = cameraDevice?.createCaptureRequest(
                     CameraDevice.TEMPLATE_STILL_CAPTURE)?.apply {
@@ -884,15 +841,37 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
                 set(CaptureRequest.CONTROL_AF_MODE,
                         CaptureRequest.CONTROL_AF_MODE_OFF)
-                set(CaptureRequest.LENS_FOCUS_DISTANCE, 0.22f)
+                set(CaptureRequest.LENS_FOCUS_DISTANCE, 0.32f)
                 if (gpsLocation != null )
                     set(CaptureRequest.JPEG_GPS_LOCATION, gpsLocation?.getLocation()
                 )
             }
             val captureCallback = object : CameraCaptureSession.CaptureCallback() {
+
+                override fun onCaptureStarted(session: CameraCaptureSession?, request: CaptureRequest?, timestamp: Long, frameNumber: Long) {
+                    requestTimestamp = timestamp
+                    motionPositionSensorData.clearData()
+                    motionPositionSensorData.startDataCollection()
+                    Logger.writeToLogger("CameraFragment: captureStillPicture() onCaptureStarted timestamp: $timestamp \n")
+                }
+
+                override fun onCaptureFailed(session: CameraCaptureSession?, request: CaptureRequest?, failure: CaptureFailure?) {
+                    Logger.writeToLogger("CameraFragment: onCaptureFailed():  $failure \n")
+                }
+
                 override fun onCaptureCompleted(session: CameraCaptureSession,
                         request: CaptureRequest,
                         result: TotalCaptureResult) {
+                    if(result.get(CaptureResult.SENSOR_TIMESTAMP) == requestTimestamp) {
+                        motionPositionSensorData.stopDataCollection()
+                        lastSavedPictureTime = time.getTime()
+                        Logger.writeToLogger("CameraFragment: captureStillPicture() onCaptureCompleted: FOCUS DISTANCE:  " +
+                                "${result.get(CaptureResult.LENS_FOCUS_DISTANCE)} /  ISO: ${result.get(CaptureResult.SENSOR_SENSITIVITY)} " +
+                                " / Belichtungszeit: ${result.get(CaptureResult.SENSOR_EXPOSURE_TIME)} " +
+                                "/ Frame Rate: ${result.get(CaptureResult.SENSOR_FRAME_DURATION)} / Zeitstempel: ${result.get(CaptureResult.SENSOR_TIMESTAMP)} \n")
+                        // Nach der Aufnahme wird der Kamera Zustand auf preview gesetzt
+                        unlockFocus()
+                    }
                 }
             }
 
@@ -905,13 +884,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
             Logger.writeToLogger("CameraFragment: captureStillPicture() CameraAccessException\n")
             Log.e(TAG, e.toString())
         }
-        // Nach der Aufnahme wird der Kamera Zustand auf preview gesetzt
-        unlockFocus()
     }
 
     /**
-     * This method should be called when still image capture sequence is
-     * finished.
+     * Die Methode wird aufgerufen, nachdem ein einzelnes Foto aufgenommen wurde in der Methode captureStillPicture.
      */
     private fun unlockFocus() {
         try {

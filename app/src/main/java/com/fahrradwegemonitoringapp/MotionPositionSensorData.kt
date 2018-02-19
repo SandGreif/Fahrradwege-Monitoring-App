@@ -3,6 +3,7 @@ package com.fahrradwegemonitoringapp
 import android.app.Activity
 import android.content.Context
 import android.hardware.*
+import android.widget.Toast
 import java.math.RoundingMode
 import java.text.DecimalFormat
 import kotlin.math.PI

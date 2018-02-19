@@ -21,9 +21,9 @@ class GPSLocation(private val activity: Activity)  {
 
     private var location: Location? = null
 
-    private lateinit var locationManager : LocationManager;
+    private lateinit var locationManager : LocationManager
 
-    private lateinit var locationListener : LocationListener;
+    private lateinit var locationListener : LocationListener
 
     /**
      * Wird benötigt um abzufragen ob  beim letzten Aufruf der callback Methode
@@ -100,7 +100,7 @@ class GPSLocation(private val activity: Activity)  {
      * Meldet die Listener ab. Sollte aufgerufen wenn die App geschlossen wird.
      */
     fun onStop() {
-        locationManager!!.removeUpdates(locationListener)
+        locationManager.removeUpdates(locationListener)
     }
 
 }
