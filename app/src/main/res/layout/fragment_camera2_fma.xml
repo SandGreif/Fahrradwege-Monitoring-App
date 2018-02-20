@@ -32,16 +32,6 @@
         android:layout_alignParentStart="true"
         android:background="#008B8B">
 
-        <ToggleButton
-            android:id="@+id/toggleButtonStart"
-            style="@android:style/Widget.Button.Toggle"
-            android:layout_width="150dp"
-            android:layout_height="90dp"
-            android:layout_gravity="center"
-            android:checked="false"
-            android:textOff="@string/buttonStartTxt"
-            android:textOn="@string/buttonStopTxt" />
-
     </FrameLayout>
 
     <TextView
@@ -56,5 +46,31 @@
         android:textColor="?android:attr/colorBackground"
         android:textSize="24sp"
         android:textStyle="bold|italic" />
+
+    <ToggleButton
+        android:id="@+id/toggleButtonStart"
+        style="@android:style/Widget.Button.Toggle"
+        android:layout_width="150dp"
+        android:layout_height="90dp"
+        android:layout_alignBottom="@+id/control"
+        android:layout_alignParentStart="true"
+        android:layout_gravity="center"
+        android:layout_marginBottom="10dp"
+        android:layout_marginStart="36dp"
+        android:checked="false"
+        android:textOff="@string/buttonStartTxt"
+        android:textOn="@string/buttonStopTxt" />
+
+    <ToggleButton
+        android:id="@+id/toggleButtonCalibration"
+        style="@android:style/Widget.Button.Toggle"
+        android:layout_width="100dp"
+        android:layout_height="90dp"
+        android:layout_alignBottom="@+id/toggleButtonStart"
+        android:layout_gravity="center"
+        android:layout_toEndOf="@+id/speedTxt"
+        android:checked="false"
+        android:textOff="@string/buttonStartCalibration"
+        android:textOn="@string/buttonStopCalibration" />
 
 </RelativeLayout>

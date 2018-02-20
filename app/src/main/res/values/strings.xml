@@ -5,4 +5,6 @@
     <string name="speedTxt"> km/h / Bilder</string>
     <string name="buttonStartTxt">Starte Datenerfassung</string>
     <string name="buttonStopTxt">Stoppe Datenerfassung</string>
+    <string name="buttonStartCalibration">Starte Kalibrierung</string>
+    <string name="buttonStopCalibration">Stoppe Kalibrierung</string>
 </resources>

@@ -111,44 +111,31 @@ class CameraFragment : Fragment(), View.OnClickListener,
     /**
      * Klassen Objekt um die Beschleunigungssensordaten zu erhalten
      */
-    private lateinit var motionPositionSensorData: MotionPositionSensorData
+    private var motionPositionSensorData: MotionPositionSensorData? = null
 
     /**
      * Klasse um  GPS Anfragen abzuhandeln
      */
     private var gpsLocation: GPSLocation? = null
 
-    private  var startTime: Long = 0
+    private var startTime: Long = 0
 
-    /*
-    * Gibt an wann das letzte Bild zum speichern bei den Image Listener verarbeitet wurde
-    */
-    private  var lastSavedPictureTime: Long = 0
-
+    private var realtimeNanos: Long = 0
+    private var realtimeElapsed: Long = 0
     /**
-     * Gibt an wann die Datenerfassung der Beschleunigungsdaten plus Gier-Nick-Roll gestartet wurde
+     * Referenz auf die GPS Position der letzten Aufnahme
      */
-    private var startGetAccelerometerDataTime: Long = 0
-    /**
-     * Breiten und Längengrad bei der letzten
-     */
-    private var locationLastLatitude: Float = 0.0f
-    private var locationLastLongtitude: Float = 0.0f
+    private var location : Location? = null
 
     /**
-     * Aktuelle Geschwindigkeit in km/h
+     * Aktuelle angenährte Geschwindigkeit in km/h
      */
     private var speed: Float = 0.0f
 
     /**
-     * Die vorherige gemessene Geschwindigkeit
+     * Die Belichtungszeit der letzten Aufnahme
      */
-    private var speedLast: Float = 0.0f
-
-    /**
-     * Geschwindikeit in km/h zwischen zwei Aufnahmen
-     */
-    private var speedBetweenCaptures: Float = 0.0f
+    private var exposureTime: Long = 0
 
     /**
      * Klasse um die aktuelle Zeit und Datum zu erhalten
@@ -316,28 +303,25 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Dies ist die callback Funktion für den [ImageReader]. Diese wurd aufgerufen, wenn ein Bild fertig ist
-     * zum abspeichern. Zu den Bild werden Features abgepeichert. Es wird für den Nutzer auch eine Text Ausgabe erstellt,
+     * Dies ist die callback Funktion für den [ImageReader]. Diese wurd aufgerufen, wenn eine  Aufnahme bereit ist
+     * zum abspeichern. Zu den Bild werden Features gesichert. Es wird für den Nutzer auch eine Text Ausgabe erstellt,
      * um diesen die aktuelle Geschwindigkeit und die Anzahl der bereits aufgenommen Bilder mitzuteilen.
      */
     private val onImageAvailableListener = OnImageAvailableListener {
         val image = it.acquireLatestImage()
-        val location = gpsLocation?.getLocation()
         if (image != null) {
             if (location != null) {
-                speed = (location.speed * 60 * 60) / 1000 // in km/h
+                speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
               //  if (((speed - 4.0f) > 0.0001)) {  // bei vorhandener Geschwindigkeit
-                speedBetweenCaptures = (speedLast + speed) / 2
                 if (imageCounter % (2000 * directoriesCounter) == 0) {
                     newFolder()
                 }
-                saveFeatures(location)
+                saveFeatures(image.timestamp)
                 saveImage(image)
-                speedLast = speed
                 if (imageCounter % 10 == 0) {
                     activity.runOnUiThread({
                         run {
-                            speedTxt.text = "%s %s %d %s".format(df.format(speedLast), "km/h /", imageCounter, "Bilder")
+                            speedTxt.text = "%s %s %d %s".format(df.format(speed), "km/h /", imageCounter, "Bilder")
                         }
                     })
                 }
@@ -358,28 +342,22 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Post.: Bild ist abgespeichert
      */
     private fun saveImage(image: Image) {
-        ImageSaver().saveImage(image, File(actualDirectory, ( "$lastSavedPictureTime" + ".jpg")))
+        ImageSaver().saveImage(image, File(actualDirectory, ( "${image.timestamp}" + ".jpg")))
         imageCounter++
     }
 
     /**
      * Speichert Features ab: Zeit in ms/ GPS /
-     * Prec.: Location != null, diese Methode muss vor der Methode saveImage aufgerufen werden
+     * Prec.: Diese Methode muss vor der Methode saveImage aufgerufen werden. timestamp > 0
      * Postc.: Features wurden in eine Datei geschrieben
      */
-    private fun saveFeatures(location : Location) {
-        if(imageCounter == 0) {
-            locationLastLatitude = location.latitude.toFloat()
-            locationLastLongtitude =  location.longitude.toFloat()
-        }
-        val latitudeAverage = (location.latitude.toFloat() + locationLastLatitude) / 2
-        val longitudeAverage = (location.longitude.toFloat() + locationLastLongtitude) / 2
-        val accelerometerString = motionPositionSensorData.getData()
-        val captureTime = lastSavedPictureTime-startGetAccelerometerDataTime
-        fileLocation.appendText("$lastSavedPictureTime,$latitudeAverage,$longitudeAverage," +
-                "$speedBetweenCaptures,$accelerometerString,$captureTime \n")
-        locationLastLatitude = location.latitude.toFloat()
-        locationLastLongtitude =  location.longitude.toFloat()
+    private fun saveFeatures(timestamp : Long) {
+        val latitude = location?.latitude?.toFloat()
+        val longitude = location?.longitude?.toFloat()
+        val accelerometerString = motionPositionSensorData?.getData()
+        fileLocation.appendText("$timestamp,$latitude,$longitude," +
+                "$speed,$accelerometerString,${motionPositionSensorData?.getFirstTimestamp()}," +
+                "$exposureTime,${motionPositionSensorData?.getLastTimestamp()},$realtimeNanos,$realtimeElapsed \n")
     }
 
     /**
@@ -406,26 +384,36 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("features.csv"))
-        fileLocation.appendText("Millisekunden,Breitengrad,Laengengrad,Geschwindigkeit," +
+        fileLocation.appendText("Zeitstempel,Breitengrad,Laengengrad,Geschwindigkeit," +
                 "MittelWX,VarianzX,StandardAX,MittelWY,VarianzY,StandardAY,MittelWZ,VarianzZ,StandardAZ," +
-                "Azimuth,MittelWPitch,VarianzPitch,StandardAPitch,MittelWRoll,VarianzRoll,StandardRoll,Aufnahmezeit \n")
+                "Azimuth,MittelWPitch,VarianzPitch,StandardAPitch,MittelWRoll,VarianzRoll,StandardRoll,StartBewegungsD,Belichtungszeit,StopBewegungsD \n")
     }
 
     override fun onCreateView(inflater: LayoutInflater,
-            container: ViewGroup?,
-            savedInstanceState: Bundle?
+                              container: ViewGroup?,
+                              savedInstanceState: Bundle?
     ): View? = inflater.inflate(R.layout.fragment_camera2_fma, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         textureView = view.findViewById(R.id.texture)
         speedTxt = view.findViewById(R.id.speedTxt) as TextView
         val toggleButton = view.findViewById(R.id.toggleButtonStart) as ToggleButton
+        val toggleButtonCalibration = view.findViewById(R.id.toggleButtonCalibration) as ToggleButton
         toggleButton.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                if(!takePictures())
+                if (!takePictures())
                     toggleButton.toggle()
             } else {
                 stopPictures()
+            }
+        }
+        toggleButtonCalibration.setOnCheckedChangeListener { _, isChecked ->
+            if (motionPositionSensorData != null) {
+                if (isChecked) {
+                    motionPositionSensorData?.startCalibration()
+                } else {
+                    motionPositionSensorData?.stopCalibration()
+                }
             }
         }
     }
@@ -479,7 +467,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
             gpsLocation = GPSLocation(activity)
             gpsLocation?.init()
             motionPositionSensorData = MotionPositionSensorData()
-            motionPositionSensorData.init(this.activity, gpsLocation!!)
+            motionPositionSensorData?.init(this.activity, gpsLocation!!)
         }
         if (permissionRequest.size > 0) {
                 var message = "Die Anwendung Fahrradwege Monitoring App benötigt Zugriff auf: " + permissionRequest[0]
@@ -519,7 +507,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     gpsLocation = GPSLocation(activity)
                     gpsLocation?.init()
                     motionPositionSensorData = MotionPositionSensorData()
-                    motionPositionSensorData.init(this.activity, gpsLocation!!)
+                    motionPositionSensorData?.init(this.activity, gpsLocation!!)
                     return
                 }
             }
@@ -662,7 +650,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         super.onStop()
         Logger.writeToLogger("CameraFragment: onStop() wurde aufgerufen \n")
         closeCamera()
-        motionPositionSensorData.onStop()
+        motionPositionSensorData?.onStop()
         gpsLocation?.onStop()
     }
 
@@ -799,26 +787,24 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Run the precapture sequence for capturing a still image.
+     * Nimmt ein vorläufiges Foto auf, um dann ein qualitatives Bild aufzunehmen.
+     * Dafür wird die automatisierte Belichtungsberechnung getriggert
      */
     private fun runPrecaptureSequence() {
         try {
-            // This is how to tell the camera to trigger.
             previewRequestBuilder.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER,
                     CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER_START)
-            // Tell #captureCallback to wait for the precapture sequence to be set.
             state = STATE_WAITING_PRECAPTURE
             captureSession?.capture(previewRequestBuilder.build(), captureCallback,
                     backgroundHandler)
         } catch (e: CameraAccessException) {
-            Logger.writeToLogger("CameraFragment: runPrecaptureSequence() CameraAccessException\n")
+            Logger.writeToLogger("CameraFragment: runPrecaptureSequence() CameraAccessException \n")
             Log.e(TAG, e.toString())
         }
-
     }
 
     /**
-     * Capture a still picture.
+     * Nimmt ein einzelnes JPG Bild auf.
      */
     private fun captureStillPicture() {
         try {
@@ -826,11 +812,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 Logger.writeToLogger("CameraFragment: captureStillPicture() activity == null || cameraDevice == null \n")
                 return
             }
-            var requestTimestamp : Long = 0
+            motionPositionSensorData?.clearData() // Vor der Aufnahme werden die letzten erfassten Sensordaten(Beschl./Gier-Roll-Nick) entfernt
+            var frameNumberStart : Long = 0
             val rotation = activity.windowManager.defaultDisplay.rotation
             val captureBuilder = cameraDevice?.createCaptureRequest(
                     CameraDevice.TEMPLATE_STILL_CAPTURE)?.apply {
-                addTarget(imageReader?.surface)
+                addTarget(imageReader?.surface) // Zum abspeichern wird das Bild an den ImageReader Handler geschickt
 
                 // Sensor orientation is 90 for most devices, or 270 for some devices (eg. Nexus 5X)
                 // We have to take that into account and rotate JPEG properly.
@@ -838,20 +825,20 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 // For devices with orientation of 270, we need to rotate the JPEG 180 degrees.
                 set(CaptureRequest.JPEG_ORIENTATION,
                         (ORIENTATIONS.get(rotation) + sensorOrientation + 270) % 360)
-
                 set(CaptureRequest.CONTROL_AF_MODE,
                         CaptureRequest.CONTROL_AF_MODE_OFF)
                 set(CaptureRequest.LENS_FOCUS_DISTANCE, 0.32f)
-                if (gpsLocation != null )
+                if (gpsLocation != null ) // Wenn ungleich null werden GPS Daten zu den Bild Metadaten hinzugefügt
                     set(CaptureRequest.JPEG_GPS_LOCATION, gpsLocation?.getLocation()
                 )
             }
             val captureCallback = object : CameraCaptureSession.CaptureCallback() {
 
                 override fun onCaptureStarted(session: CameraCaptureSession?, request: CaptureRequest?, timestamp: Long, frameNumber: Long) {
-                    requestTimestamp = timestamp
-                    motionPositionSensorData.clearData()
-                    motionPositionSensorData.startDataCollection()
+                    frameNumberStart = frameNumber
+                    if(gpsLocation != null ) {
+                        location = gpsLocation?.getLocation()
+                    }
                     Logger.writeToLogger("CameraFragment: captureStillPicture() onCaptureStarted timestamp: $timestamp \n")
                 }
 
@@ -859,12 +846,15 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     Logger.writeToLogger("CameraFragment: onCaptureFailed():  $failure \n")
                 }
 
+
                 override fun onCaptureCompleted(session: CameraCaptureSession,
                         request: CaptureRequest,
                         result: TotalCaptureResult) {
-                    if(result.get(CaptureResult.SENSOR_TIMESTAMP) == requestTimestamp) {
-                        motionPositionSensorData.stopDataCollection()
-                        lastSavedPictureTime = time.getTime()
+                    if(result.frameNumber == frameNumberStart) { // Nur wenn die Frame Nummern übereinstimmen ist dies das einzelne angefragte Bild
+                        motionPositionSensorData?.stopDataCollection()
+                        exposureTime = result.get(CaptureResult.SENSOR_EXPOSURE_TIME)
+                        realtimeElapsed = SystemClock.elapsedRealtimeNanos()
+                        realtimeNanos = System.nanoTime()
                         Logger.writeToLogger("CameraFragment: captureStillPicture() onCaptureCompleted: FOCUS DISTANCE:  " +
                                 "${result.get(CaptureResult.LENS_FOCUS_DISTANCE)} /  ISO: ${result.get(CaptureResult.SENSOR_SENSITIVITY)} " +
                                 " / Belichtungszeit: ${result.get(CaptureResult.SENSOR_EXPOSURE_TIME)} " +
@@ -874,12 +864,15 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     }
                 }
             }
-
+            // In diesem Block wird die Konitinuierlich Aufnahme von Bildern abgebrochen und eine Anfrage
+            // gestellt für eine einzelne Aufnahme
             captureSession?.apply {
                 stopRepeating()
                 abortCaptures()
+                motionPositionSensorData?.startDataCollection()
                 capture(captureBuilder?.build(), captureCallback, null)
             }
+
         } catch (e: CameraAccessException) {
             Logger.writeToLogger("CameraFragment: captureStillPicture() CameraAccessException\n")
             Log.e(TAG, e.toString())

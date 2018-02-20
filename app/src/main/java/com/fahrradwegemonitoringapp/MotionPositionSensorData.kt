@@ -3,7 +3,6 @@ package com.fahrradwegemonitoringapp
 import android.app.Activity
 import android.content.Context
 import android.hardware.*
-import android.widget.Toast
 import java.math.RoundingMode
 import java.text.DecimalFormat
 import kotlin.math.PI
@@ -25,6 +24,7 @@ class MotionPositionSensorData : SensorEventListener {
     private var mAccelerometer: Sensor? = null
     private var mMagneticField: Sensor? = null
     private var activity: Activity? = null
+
     /**
      * Listen zum zwischenspeichern der Beschleunigungssensordaten x,y,z
      */
@@ -35,6 +35,13 @@ class MotionPositionSensorData : SensorEventListener {
     private var azimuthList: MutableList<Float>? = null
     private var pitchList: MutableList<Float>? = null
     private var rollList: MutableList<Float>? = null
+
+    /**
+     *  In diesen Variablen stehen die Kallibrierungsoffsets für
+     *  Roll und Nick Winkel
+     */
+    private var pitchOffset: Float = 0.0f
+    private var rollOffset: Float = 0.0f
 
     // Current data from accelerometer & magnetometer.  The arrays hold values
     // for X, Y, and Z.
@@ -56,7 +63,20 @@ class MotionPositionSensorData : SensorEventListener {
     /**
      * Boolean Variable die angibt ob Daten Samples gesammelt werden sollen
      */
-    private var isDataGatheringActive: Boolean = false
+    private var isDataGatheringActive : Boolean = false
+
+    /**
+     * Gibt an ob innerhalb einer Datenerfassungs-Routine noch keone Sensordaten erfasst wurden
+     */
+    private var firstGathering : Boolean = true
+
+    /**
+     * firstTimestamp gibt den Zeitstempel an der ersten Datenerfassung innerhalb eines Fensters.
+     * Innerhalb eines Fensters werden mehrere Daten erfasst zwischen startDataCollection und stopDataCollection.
+     * lastTimestamp der letzte erfasste Zeitstempel zu einem Event in einem Fenster.
+     */
+    private var firstTimestamp : Long = 0
+    private var lastTimestamp : Long = 0
 
     private lateinit var location : GPSLocation
 
@@ -94,15 +114,13 @@ class MotionPositionSensorData : SensorEventListener {
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
-        if (event != null && isDataGatheringActive) {
+        if (event != null) {
             val sensorType = event.sensor.type
             when (sensorType) {
                 Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
                 Sensor.TYPE_MAGNETIC_FIELD -> mMagnetometerData = event.values.clone()
                 else -> return
             }
-            var azimuth : Float
-            val geoField : GeomagneticField
             // Berechnet die Rotationsmatrix. Dabei werden die Beschleunigungssensordaten und
             // Magnetsensordaten genutzt, um die Smartphone spezifischen Koordinaten auf die Welt Koordinaten
             // zu transformieren
@@ -121,44 +139,33 @@ class MotionPositionSensorData : SensorEventListener {
             gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
             gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
 
-            azimuth = orientationValues[0]
-            azimuth *= (180 / PI.toFloat())
-            if(location.getLocation() != null) {
-                // Wird benötigt um den magnetischen Norden in welche die Variable azimuth
-                // zeigt in den geografischen Norden zu konvertieren
-                geoField = GeomagneticField(location.getLocation()!!.latitude.toFloat(),
-                        location.getLocation()!!.longitude.toFloat(),
-                        location.getLocation()!!.altitude.toFloat(),
-                        System.currentTimeMillis())
-                azimuth += geoField.declination // Berechnet den magnetischen Norden zu den geografischen Norden
+            if(isDataGatheringActive) {
+                if(firstGathering) {
+                    firstGathering = false
+                    firstTimestamp = event.timestamp
+                } else {
+                    lastTimestamp = event.timestamp
+                }
+                var azimuth: Float
+                val geoField: GeomagneticField
+                azimuth = orientationValues[0]
+                azimuth *= (180 / PI.toFloat())
+                if (location.getLocation() != null) {
+                    // Wird benötigt um den magnetischen Norden in welche die Variable azimuth
+                    // zeigt in den geografischen Norden zu konvertieren
+                    geoField = GeomagneticField(location.getLocation()!!.latitude.toFloat(),
+                            location.getLocation()!!.longitude.toFloat(),
+                            location.getLocation()!!.altitude.toFloat(),
+                            System.currentTimeMillis())
+                    azimuth += geoField.declination // Berechnet den magnetischen Norden zu den geografischen Norden
+                }
+                azimuthList?.add(azimuth)
+                pitchList?.add(orientationValues[1] - pitchOffset)
+                rollList?.add(orientationValues[2] - rollOffset)
+                xAxisList?.add(event.values[0] - gravity[0])
+                yAxisList?.add(event.values[1] - gravity[1])
+                zAxisList?.add(event.values[2] - gravity[2])
             }
-            azimuthList?.add(azimuth)
-            pitchList?.add(orientationValues[1])
-            rollList?.add(orientationValues[2])
-            xAxisList?.add(event.values[0] - gravity[0])
-            yAxisList?.add(event.values[1] - gravity[1])
-            zAxisList?.add(event.values[2] - gravity[2])
-        }
-    }
-
-    /**
-     * Diese Methode startet die Ansammlung von Daten des linearen Beschleunigungssensors
-     * Prec.:
-     * Postc.: Daten werden erfasst
-     */
-    fun startDataCollection() {
-        if(!isDataGatheringActive)
-            isDataGatheringActive = true
-    }
-
-    /**
-     * Diese Funktion stopt die Datenerfassung dieser Klasse.
-     * Prec.:
-     * Postc.: Es werden keine Daten mehr erfasst
-     */
-    fun stopDataCollection() {
-        if(isDataGatheringActive) {
-            isDataGatheringActive = false
         }
     }
 
@@ -210,6 +217,47 @@ class MotionPositionSensorData : SensorEventListener {
                         df.format(varianceRoll).replace(',', '.') + "," + df.format(standardRoll).replace(',', '.')
         }
         return null
+    }
+
+    /**
+     * Diese Methode startet die Ansammlung von Daten des linearen Beschleunigungssensors
+     * Prec.:
+     * Postc.: Daten werden erfasst, wenn vorher keine erfasst wurden
+     */
+    fun startDataCollection() {
+        if(!isDataGatheringActive)
+            firstGathering = true
+            isDataGatheringActive = true
+    }
+
+    /**
+     * Diese Funktion stopt die Datenerfassung dieser Klasse.
+     * Prec.:
+     * Postc.: Es werden keine Daten mehr erfasst, wenn isDataGatheringActive true ist.
+     */
+    fun stopDataCollection() {
+        var result : Long = 0
+        if(isDataGatheringActive) {
+            isDataGatheringActive = false
+        }
+    }
+
+    /**
+     * Gibt den Zeitstempel des ersten Sensorevents seit Beginn von startDataCollection.
+     * Prec.:
+     * Postc.: Long Wert zurückgegeben des ersten Zeitstempel in Nanosekunden
+     */
+    fun getFirstTimestamp() : Long{
+        return firstTimestamp
+    }
+
+    /**
+     * Gibt den letzten Zeitstempel der Sensorevents zurück nachdem stopDataCollection aufgerufen wurde
+     * Prec.:
+     * Postc.: Long Wert des letzten Sensorevent Zeitstempel
+     */
+    fun getLastTimestamp() : Long {
+        return lastTimestamp
     }
 
     /**
@@ -315,5 +363,26 @@ class MotionPositionSensorData : SensorEventListener {
         return result
     }
 
+    /**
+     * Die Methode startet die Kalibration der Roll-Nick Winkel.
+     * Ziel ist es das montierte Smartphone so zu Kalibrieren das diese Winkel in Ruhezustand 0 ergeben.
+     * Hier wird dafür die Datenerfassung gestartet.
+     * Prec.: -
+     * Postc.: Datenerfassung wurde angestoßen
+     */
+    fun startCalibration()  {
+        isDataGatheringActive = true
+    }
 
+    /**
+     * Stopt die Datenerfassung. Der Mittelwert von den Winkel Roll und Nick wird berechnet.
+     * Diese Werte werden dann Offset Variablen zugewiesen.
+     * Prec.:  -
+     * Postc.: Datenerfassung gestopt. Offset wurde berechnet.
+     */
+    fun stopCalibration() {
+        isDataGatheringActive = false
+        pitchOffset = calculateMean(pitchList?.toMutableList())
+        rollOffset = calculateMean(rollList?.toMutableList())
+    }
 }
