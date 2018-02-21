@@ -316,8 +316,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private val onImageAvailableListener = OnImageAvailableListener {
         val timeMs = time.getTime()
         val image = it.acquireLatestImage()
-        // Nur wenn beide Zeitstempel übereinstimmen handelt es sich um die gefragte Aufnahme
-        if ((image != null) && (image.timestamp == exposureTimeStart)) {
+        if (image != null) {
             if (location != null) {
                 speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
               //  if (((speed - 4.0f) > 0.0001)) {  // bei vorhandener Geschwindigkeit
