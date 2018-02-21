@@ -12,7 +12,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * Quelle: Basic Camera2 example https://github.com/googlesamples/android-Camera2Basic/tree/master/kotlinApp
+ * Die Camera2 Anwendung basiert auf den Beispiel von:
+ * Basic Camera2 example https://github.com/googlesamples/android-Camera2Basic/tree/master/kotlinApp
  */
 
 package com.fahrradwegemonitoringapp
@@ -21,7 +22,6 @@ import android.Manifest
 import android.content.Context
 import android.content.DialogInterface
 import android.content.pm.PackageManager
-import android.content.res.Configuration
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.Point
@@ -38,6 +38,7 @@ import android.support.v4.app.Fragment
 import android.support.v4.content.ContextCompat
 import android.support.v7.app.AlertDialog
 import android.util.Log
+import android.util.Range
 import android.util.Size
 import android.util.SparseIntArray
 import android.view.LayoutInflater
@@ -78,6 +79,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Anzahl der gespeicherten Bilder
      */
     private var imageCounter : Int = 0
+
+    private var fpsRange: Array<Range<Int>>? = null
 
     /**
      * Anzahl der Ordner die Bilder enthalten
@@ -120,8 +123,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
     private var startTime: Long = 0
 
-    private var realtimeNanos: Long = 0
-    private var realtimeElapsed: Long = 0
     /**
      * Referenz auf die GPS Position der letzten Aufnahme
      */
@@ -136,6 +137,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Die Belichtungszeit der letzten Aufnahme
      */
     private var exposureTime: Long = 0
+
+    /**
+     * Die Belichtungsstartzeit der letzten Aufnahme in Nanosekunden seit Start der Java Virtual Machine(JVM).
+     */
+    private var exposureTimeStart: Long = 0
 
     /**
      * Klasse um die aktuelle Zeit und Datum zu erhalten
@@ -308,6 +314,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * um diesen die aktuelle Geschwindigkeit und die Anzahl der bereits aufgenommen Bilder mitzuteilen.
      */
     private val onImageAvailableListener = OnImageAvailableListener {
+        val timeMs = time.getTime()
         val image = it.acquireLatestImage()
         if (image != null) {
             if (location != null) {
@@ -316,8 +323,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 if (imageCounter % (2000 * directoriesCounter) == 0) {
                     newFolder()
                 }
-                saveFeatures(image.timestamp)
-                saveImage(image)
+                saveFeatures(timeMs)
+                saveImage(image, timeMs)
                 if (imageCounter % 10 == 0) {
                     activity.runOnUiThread({
                         run {
@@ -341,8 +348,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Prec.: Image != null
      * Post.: Bild ist abgespeichert
      */
-    private fun saveImage(image: Image) {
-        ImageSaver().saveImage(image, File(actualDirectory, ( "${image.timestamp}" + ".jpg")))
+    private fun saveImage(image: Image, ms: Long) {
+        ImageSaver().saveImage(image, File(actualDirectory, ( "$ms.jpg")))
         imageCounter++
     }
 
@@ -357,7 +364,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val accelerometerString = motionPositionSensorData?.getData()
         fileLocation.appendText("$timestamp,$latitude,$longitude," +
                 "$speed,$accelerometerString,${motionPositionSensorData?.getFirstTimestamp()}," +
-                "$exposureTime,${motionPositionSensorData?.getLastTimestamp()},$realtimeNanos,$realtimeElapsed \n")
+                "$exposureTimeStart,$exposureTime,${motionPositionSensorData?.getLastTimestamp()} \n")
     }
 
     /**
@@ -386,7 +393,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         fileLocation = File(actualDirectory, ("features.csv"))
         fileLocation.appendText("Zeitstempel,Breitengrad,Laengengrad,Geschwindigkeit," +
                 "MittelWX,VarianzX,StandardAX,MittelWY,VarianzY,StandardAY,MittelWZ,VarianzZ,StandardAZ," +
-                "Azimuth,MittelWPitch,VarianzPitch,StandardAPitch,MittelWRoll,VarianzRoll,StandardRoll,StartBewegungsD,Belichtungszeit,StopBewegungsD \n")
+                "Azimuth,MittelWPitch,VarianzPitch,StandardAPitch,MittelWRoll,VarianzRoll,StandardRoll,StartBewegungsD,StartBelichtung,Belichtungszeit,StopBewegungsD \n")
     }
 
     override fun onCreateView(inflater: LayoutInflater,
@@ -518,7 +525,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     /**
      * Hier werden die Exemplarvariablen initialisiert die von der Kamera API verwendet werden
      *
-     * @param width  Die breite der Kamera Preview
+     * @param width  Breite der Kamera Preview
      * @param height Höhe der Kamera Preview
      */
     private fun setUpCameraOutputs(width: Int, height: Int) {
@@ -526,95 +533,42 @@ class CameraFragment : Fragment(), View.OnClickListener,
         try {
             for (cameraId in manager.cameraIdList) {
                 val characteristics = manager.getCameraCharacteristics(cameraId)
-                // In dieser Anwendung wird nicht die vorder Kamera verwendet
+                // In dieser Anwendung wird nicht die vordere Kamera verwendet
                 val cameraDirection = characteristics.get(CameraCharacteristics.LENS_FACING)
                 if (cameraDirection != null &&
                         cameraDirection == CameraCharacteristics.LENS_FACING_FRONT) {
                     continue
                 }
+                fpsRange = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
                 val map = characteristics.get(
                         CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: continue
-
-                // For still image captures, we use the largest available size.
                 val largest = max(
                         Arrays.asList(*map.getOutputSizes(ImageFormat.JPEG)),
                         CompareSizesByArea())
-                imageReader = ImageReader.newInstance(captureHeight, captureWidth,
-                        ImageFormat.JPEG, /*maxImages*/ 20).apply {
-                    setOnImageAvailableListener(onImageAvailableListener, backgroundHandler)
-                }
-
-                // Find out if we need to swap dimension to get the preview size relative to sensor
-                // coordinate.
-                val displayRotation = activity.windowManager.defaultDisplay.rotation
-
-                sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION)
-                val swappedDimensions = areDimensionsSwapped(displayRotation)
-
-               val displaySize = Point()
+                val displaySize = Point()
                 activity.windowManager.defaultDisplay.getSize(displaySize)
-                val rotatedPreviewWidth = if (swappedDimensions) height else width
-                val rotatedPreviewHeight = if (swappedDimensions) width else height
-                var maxPreviewWidth = if (swappedDimensions) displaySize.y else displaySize.x
-                var maxPreviewHeight = if (swappedDimensions) displaySize.x else displaySize.y
-
+                var maxPreviewWidth = displaySize.x
+                var maxPreviewHeight = displaySize.y
                 if (maxPreviewWidth > MAX_PREVIEW_WIDTH) maxPreviewWidth = MAX_PREVIEW_WIDTH
                 if (maxPreviewHeight > MAX_PREVIEW_HEIGHT) maxPreviewHeight = MAX_PREVIEW_HEIGHT
-
-                // Danger, W.R.! Attempting to use too large a preview size could  exceed the camera
-                // bus' bandwidth limitation, resulting in gorgeous previews but the storage of
-                // garbage capture data.
+                sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION)
+                imageReader = ImageReader.newInstance(captureHeight, captureWidth,
+                        ImageFormat.JPEG, 20).apply {
+                    setOnImageAvailableListener(onImageAvailableListener, backgroundHandler)
+                }
                 previewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture::class.java),
-                        rotatedPreviewWidth, rotatedPreviewHeight,
+                        width, height,
                         maxPreviewWidth, maxPreviewHeight,
                         largest)
-
-                // We fit the aspect ratio of TextureView to the size of preview we picked.
-                if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                    textureView.setAspectRatio(previewSize.width, previewSize.height)
-                } else {
                     textureView.setAspectRatio(previewSize.height, previewSize.width)
-                }
                 this.cameraId = cameraId
-                return
             }
         } catch (e: CameraAccessException) {
             Log.e(TAG, e.toString())
         } catch (e: NullPointerException) {
-            // Currently an NPE is thrown when the Camera2API is used but not supported on the
-            // device this code runs.
             ErrorDialog.newInstance(getString(R.string.camera_error))
                     .show(childFragmentManager, FRAGMENT_DIALOG)
         }
-
-    }
-
-    /**
-     * Determines if the dimensions are swapped given the phone's current rotation.
-     *
-     * @param displayRotation The current rotation of the display
-     *
-     * @return true if the dimensions are swapped, false otherwise.
-     */
-    private fun areDimensionsSwapped(displayRotation: Int): Boolean {
-        var swappedDimensions = false
-        when (displayRotation) {
-            Surface.ROTATION_0, Surface.ROTATION_180 -> {
-                if (sensorOrientation == 90 || sensorOrientation == 270) {
-                    swappedDimensions = true
-                }
-            }
-            Surface.ROTATION_90, Surface.ROTATION_270 -> {
-                if (sensorOrientation == 0 || sensorOrientation == 180) {
-                    swappedDimensions = true
-                }
-            }
-            else -> {
-                Logger.writeToLogger("CameraFragment: areDimensionsSwapped()  Display rotation ist ungültig \n")
-                Log.e(TAG, "Display rotation ist ungültig: $displayRotation")
-            }
-        }
-        return swappedDimensions
     }
 
     /**
@@ -641,7 +595,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
             Log.e(TAG, e.toString())
         } catch (e: InterruptedException) {
             Logger.writeToLogger("CameraFragment: openCamera()  InterruptedException \n")
-            throw RuntimeException("Interrupted while trying to lock camera opening.", e)
+            throw RuntimeException("Interrupted bei der Öffnung der Kamera", e)
         }
 
     }
@@ -653,7 +607,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
         motionPositionSensorData?.onStop()
         gpsLocation?.onStop()
     }
-
 
     private fun closeCamera() {
         try {
@@ -673,7 +626,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Starts a background thread and its [Handler].
+     * Startet den Hintergrundthread [Handler].
      */
     private fun startBackgroundThread() {
         backgroundThread = HandlerThread("CameraBackground").also { it.start() }
@@ -681,7 +634,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Stops the background thread and its [Handler].
+     * Stopt den Hintergrundthread [Handler].
      */
     private fun stopBackgroundThread() {
         backgroundThread?.quitSafely()
@@ -755,7 +708,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val bufferRect = RectF(0f, 0f, previewSize.height.toFloat(), previewSize.width.toFloat())
         val centerX = viewRect.centerX()
         val centerY = viewRect.centerY()
-
         if (Surface.ROTATION_90 == rotation || Surface.ROTATION_270 == rotation) {
             bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY())
             val scale = Math.max(
@@ -805,6 +757,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
     /**
      * Nimmt ein einzelnes JPG Bild auf.
+     *
      */
     private fun captureStillPicture() {
         try {
@@ -815,27 +768,29 @@ class CameraFragment : Fragment(), View.OnClickListener,
             motionPositionSensorData?.clearData() // Vor der Aufnahme werden die letzten erfassten Sensordaten(Beschl./Gier-Roll-Nick) entfernt
             var frameNumberStart : Long = 0
             val rotation = activity.windowManager.defaultDisplay.rotation
-            val captureBuilder = cameraDevice?.createCaptureRequest(
-                    CameraDevice.TEMPLATE_STILL_CAPTURE)?.apply {
-                addTarget(imageReader?.surface) // Zum abspeichern wird das Bild an den ImageReader Handler geschickt
 
-                // Sensor orientation is 90 for most devices, or 270 for some devices (eg. Nexus 5X)
-                // We have to take that into account and rotate JPEG properly.
-                // For devices with orientation of 90, we return our mapping from ORIENTATIONS.
-                // For devices with orientation of 270, we need to rotate the JPEG 180 degrees.
+            val captureBuilder = cameraDevice?.createCaptureRequest(
+                    CameraDevice.TEMPLATE_STILL_CAPTURE)?.apply {// Block an Anweisungen
+                addTarget(imageReader?.surface) // Zum abspeichern wird das Bild an den ImageReader Handler geschickt
+                // Die Kamera Ausrichtung beträgt 90 Grad auf den meisten Geräten. Bei einigen beträgt diese allerdings 270 Grad
                 set(CaptureRequest.JPEG_ORIENTATION,
                         (ORIENTATIONS.get(rotation) + sensorOrientation + 270) % 360)
                 set(CaptureRequest.CONTROL_AF_MODE,
                         CaptureRequest.CONTROL_AF_MODE_OFF)
                 set(CaptureRequest.LENS_FOCUS_DISTANCE, 0.32f)
+                // Szenenmodus für bewgende Objekte
+                set(CaptureRequest.CONTROL_SCENE_MODE,
+                        CaptureRequest.CONTROL_SCENE_MODE_ACTION)
+                set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRange?.get(fpsRange?.size!! - 1))
                 if (gpsLocation != null ) // Wenn ungleich null werden GPS Daten zu den Bild Metadaten hinzugefügt
                     set(CaptureRequest.JPEG_GPS_LOCATION, gpsLocation?.getLocation()
-                )
+                    )
             }
             val captureCallback = object : CameraCaptureSession.CaptureCallback() {
 
                 override fun onCaptureStarted(session: CameraCaptureSession?, request: CaptureRequest?, timestamp: Long, frameNumber: Long) {
                     frameNumberStart = frameNumber
+                    exposureTimeStart = timestamp
                     if(gpsLocation != null ) {
                         location = gpsLocation?.getLocation()
                     }
@@ -846,19 +801,16 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     Logger.writeToLogger("CameraFragment: onCaptureFailed():  $failure \n")
                 }
 
-
                 override fun onCaptureCompleted(session: CameraCaptureSession,
-                        request: CaptureRequest,
-                        result: TotalCaptureResult) {
+                                                request: CaptureRequest,
+                                                result: TotalCaptureResult) {
                     if(result.frameNumber == frameNumberStart) { // Nur wenn die Frame Nummern übereinstimmen ist dies das einzelne angefragte Bild
                         motionPositionSensorData?.stopDataCollection()
                         exposureTime = result.get(CaptureResult.SENSOR_EXPOSURE_TIME)
-                        realtimeElapsed = SystemClock.elapsedRealtimeNanos()
-                        realtimeNanos = System.nanoTime()
-                        Logger.writeToLogger("CameraFragment: captureStillPicture() onCaptureCompleted: FOCUS DISTANCE:  " +
+                        Logger.writeToLogger("CameraFragment: captureStillPicture() onCaptureCompleted: Fokusdistanz:  " +
                                 "${result.get(CaptureResult.LENS_FOCUS_DISTANCE)} /  ISO: ${result.get(CaptureResult.SENSOR_SENSITIVITY)} " +
                                 " / Belichtungszeit: ${result.get(CaptureResult.SENSOR_EXPOSURE_TIME)} " +
-                                "/ Frame Rate: ${result.get(CaptureResult.SENSOR_FRAME_DURATION)} / Zeitstempel: ${result.get(CaptureResult.SENSOR_TIMESTAMP)} \n")
+                                "/ Rahmenzeitdauer: ${result.get(CaptureResult.SENSOR_FRAME_DURATION)} / Zeitstempel: ${result.get(CaptureResult.SENSOR_TIMESTAMP)} \n")
                         // Nach der Aufnahme wird der Kamera Zustand auf preview gesetzt
                         unlockFocus()
                     }
@@ -869,10 +821,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
             captureSession?.apply {
                 stopRepeating()
                 abortCaptures()
-                motionPositionSensorData?.startDataCollection()
                 capture(captureBuilder?.build(), captureCallback, null)
+                motionPositionSensorData?.startDataCollection()
             }
-
         } catch (e: CameraAccessException) {
             Logger.writeToLogger("CameraFragment: captureStillPicture() CameraAccessException\n")
             Log.e(TAG, e.toString())
@@ -908,6 +859,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
         return result
     }
 
+    /**
+     * Die Aufnahme von Bildern wird gestopt.
+     */
     private fun stopPictures () {
         buttonCaptureRequestActive = false
     }
@@ -931,12 +885,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
         }
 
         /**
-         * Tag for the [Log].
+         * Tag für den [Log].
          */
         private const val TAG = "Camera2 FMA "
 
         /**
-         * Camera state: Showing camera preview.
+         * Camera Zustand: Showing camera preview.
          */
         private const val STATE_PREVIEW = 0
 

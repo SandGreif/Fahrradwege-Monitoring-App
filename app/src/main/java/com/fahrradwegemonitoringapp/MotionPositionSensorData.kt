@@ -142,9 +142,9 @@ class MotionPositionSensorData : SensorEventListener {
             if(isDataGatheringActive) {
                 if(firstGathering) {
                     firstGathering = false
-                    firstTimestamp = event.timestamp
+                    firstTimestamp = System.nanoTime()
                 } else {
-                    lastTimestamp = event.timestamp
+                    lastTimestamp = System.nanoTime()
                 }
                 var azimuth: Float
                 val geoField: GeomagneticField

@@ -21,8 +21,8 @@
         android:id="@+id/texture"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_alignParentTop="true"
-        android:layout_centerHorizontal="true" />
+        android:layout_centerHorizontal="true"
+        android:layout_centerVertical="true" />
 
     <FrameLayout
         android:id="@+id/control"
@@ -40,12 +40,11 @@
         android:layout_height="wrap_content"
         android:layout_above="@+id/control"
         android:layout_centerHorizontal="true"
-        android:layout_marginBottom="30dp"
-        android:fontFamily="cursive"
+        android:layout_marginBottom="24dp"
+        android:fontFamily="sans-serif-condensed"
         android:text="@string/speedTxt"
         android:textColor="?android:attr/colorBackground"
-        android:textSize="24sp"
-        android:textStyle="bold|italic" />
+        android:textSize="24sp" />
 
     <ToggleButton
         android:id="@+id/toggleButtonStart"
@@ -66,9 +65,10 @@
         style="@android:style/Widget.Button.Toggle"
         android:layout_width="100dp"
         android:layout_height="90dp"
-        android:layout_alignBottom="@+id/toggleButtonStart"
+        android:layout_alignTop="@+id/toggleButtonStart"
         android:layout_gravity="center"
-        android:layout_toEndOf="@+id/speedTxt"
+        android:layout_marginStart="41dp"
+        android:layout_toEndOf="@+id/toggleButtonStart"
         android:checked="false"
         android:textOff="@string/buttonStartCalibration"
         android:textOn="@string/buttonStopCalibration" />
