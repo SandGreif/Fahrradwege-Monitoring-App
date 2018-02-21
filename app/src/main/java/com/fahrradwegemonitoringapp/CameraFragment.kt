@@ -195,7 +195,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
     /**
      * Der aktuelle Zustand um Bilder aufzunehmen.
-     * Der Anfangszustandand ist Preview. In welchem für die Preview Bilder aufgenommen werden
+     * Der Anfangszustandand ist Preview. In welchem für die Preview Bilder aufgenommen werden.
      *
      * @see .captureCallback
      */
@@ -217,18 +217,23 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     private val captureCallback = object : CameraCaptureSession.CaptureCallback() {
 
+        /**
+         * Die Methode implementiert mit einem Switch Case eine Zustandmaschine. Dabei ändert sich der
+         * Zustand der Variablen state. Es gibt fünf Zustände [STATE_PREVIEW], [STATE_TAKE_PICTURE], [STATE_WAITING_PRECAPTURE],
+         * [STATE_WAITING_NON_PRECAPTURE], [STATE_PICTURE_TAKEN]} Der Zustand wird auch in unterschiedlichen Methoden dieser Klasse
+         * gesetzt. Dabei wird diese Methode aufgerufen sobald ein Bild fertig aufgenommen [onCaptureCompleted] oder teilweise
+         * verarbeitet [onCaptureProgressed] wurde.
+         */
         private fun process(result: CaptureResult) {
             when (state) {
                 STATE_PREVIEW -> Unit
-                STATE_WAITING_LOCK -> capturePicture(result)
+                STATE_TAKE_PICTURE -> capturePicture(result)
                 STATE_WAITING_PRECAPTURE -> {
                     val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
-                    if (aeState == null ||
-                            aeState == CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
+                    if (aeState == null || aeState == CaptureResult.CONTROL_AE_STATE_PRECAPTURE
+                    || aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
                         state = STATE_WAITING_NON_PRECAPTURE
                         Logger.writeToLogger("CameraFragment: captureCallback() STATE_WAITING_NON_PRECAPTURE \n")
-                    } else {
-                        runPrecaptureSequence()
                     }
                 }
                 STATE_WAITING_NON_PRECAPTURE -> {
@@ -373,7 +378,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     private fun requestNextImage() {
         if(buttonCaptureRequestActive) {
-            lockFocus()
+            state = STATE_TAKE_PICTURE
         } else {
             activeImageCapturing = false
         }
@@ -725,22 +730,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Erster Schritt um ein Bild aufzunehmen
-     */
-    private fun lockFocus() {
-        try {
-            state = STATE_WAITING_LOCK
-            captureSession?.capture(previewRequestBuilder.build(), captureCallback,
-                    backgroundHandler)
-        } catch (e: CameraAccessException) {
-            Logger.writeToLogger("CameraFragment: lockFocus() CameraAccessException \n")
-            Log.e(TAG, e.toString())
-        }
-    }
-
-    /**
-     * Nimmt ein vorläufiges Foto auf, um dann ein qualitatives Bild aufzunehmen.
-     * Dafür wird die automatisierte Belichtungsberechnung getriggert
+     * Nimmt ein vorläufiges Foto auf, um dann ein qualitatives Bild mit guter Belichtung aufzunehmen.
+     * Dafür wird die automatisierte Belichtungsberechnung getriggert.
      */
     private fun runPrecaptureSequence() {
         try {
@@ -821,8 +812,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
             captureSession?.apply {
                 stopRepeating()
                 abortCaptures()
-                capture(captureBuilder?.build(), captureCallback, null)
                 motionPositionSensorData?.startDataCollection()
+                capture(captureBuilder?.build(), captureCallback, null)
             }
         } catch (e: CameraAccessException) {
             Logger.writeToLogger("CameraFragment: captureStillPicture() CameraAccessException\n")
@@ -851,7 +842,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
             activeImageCapturing = true
             Toast.makeText(activity, "Daten werden erfasst", Toast.LENGTH_SHORT).show()
             result = true
-            lockFocus()
+            state = STATE_TAKE_PICTURE
         } else {
             Toast.makeText(activity, "Daten erfassung gestoppt", Toast.LENGTH_SHORT).show()
             result = false
@@ -885,42 +876,43 @@ class CameraFragment : Fragment(), View.OnClickListener,
         }
 
         /**
-         * Tag für den [Log].
+         * Tag für den [Log]
          */
         private const val TAG = "Camera2 FMA "
 
         /**
-         * Camera Zustand: Showing camera preview.
+         * Die Kamera zeigt die Preview an
          */
         private const val STATE_PREVIEW = 0
 
         /**
-         * Camera state: Waiting for the focus to be locked.
+         * In diesem Zustand wird eine Anfrage gestellt für eine Bildaufnahme
          */
-        private const val STATE_WAITING_LOCK = 1
+        private const val STATE_TAKE_PICTURE = 1
 
         /**
-         * Camera state: Waiting for the exposure to be precapture state.
+         * In diesem Zustand wird ein vorläufige Aufnahme gemacht um die Qualität der automatischen Belichtung
+         * zu verbessern
          */
         private const val STATE_WAITING_PRECAPTURE = 2
 
         /**
-         * Camera state: Waiting for the exposure state to be something other than precapture.
+         * Wartet darauf das der Belichtungszustand sich nicht mehr in Precapture befindet
          */
         private const val STATE_WAITING_NON_PRECAPTURE = 3
 
         /**
-         * Camera state: Picture was taken.
+         * Ein Bild wurde aufgenommen
          */
         private const val STATE_PICTURE_TAKEN = 4
 
         /**
-         * Max preview width that is guaranteed by Camera2 API
+         * Die Maximale mögliche Preview Höhe welche von der Camera2 API sichergestellt wird
          */
         private const val MAX_PREVIEW_WIDTH = 640
 
         /**
-         * Max preview height that is guaranteed by Camera2 API
+         * Die Maximale mögliche Preview Breite welche von der Camera2 API sichergestellt wird
          */
         private const val MAX_PREVIEW_HEIGHT = 480
 
