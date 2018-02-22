@@ -218,11 +218,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private val captureCallback = object : CameraCaptureSession.CaptureCallback() {
 
         /**
-         * Die Methode implementiert mit einem Switch Case eine Zustandmaschine. Dabei ändert sich der
+         * Die Methode implementiert mit einem "switch case" eine Zustandmaschine. Dabei ändert sich der
          * Zustand der Variablen state. Es gibt fünf Zustände [STATE_PREVIEW], [STATE_TAKE_PICTURE], [STATE_WAITING_PRECAPTURE],
          * [STATE_WAITING_NON_PRECAPTURE], [STATE_PICTURE_TAKEN]} Der Zustand wird auch in unterschiedlichen Methoden dieser Klasse
          * gesetzt. Dabei wird diese Methode aufgerufen sobald ein Bild fertig aufgenommen [onCaptureCompleted] oder teilweise
          * verarbeitet [onCaptureProgressed] wurde.
+         * Siehe auch die Anlagen UML -> CameraStateDiagram
          */
         private fun process(result: CaptureResult) {
             when (state) {
@@ -315,7 +316,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
     /**
      * Dies ist die callback Funktion für den [ImageReader]. Diese wurd aufgerufen, wenn eine  Aufnahme bereit ist
-     * zum abspeichern. Zu den Bild werden Features gesichert. Es wird für den Nutzer auch eine Text Ausgabe erstellt,
+     * zum abspeichern. Zu den Bild werden Features in eine Datei geschrieben. Es wird für den Nutzer auch eine Text Ausgabe erstellt,
      * um diesen die aktuelle Geschwindigkeit und die Anzahl der bereits aufgenommen Bilder mitzuteilen.
      */
     private val onImageAvailableListener = OnImageAvailableListener {
@@ -359,8 +360,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Speichert Features ab: Zeit in ms/ GPS /
-     * Prec.: Diese Methode muss vor der Methode saveImage aufgerufen werden. timestamp > 0
+     * Speichert Features ab: Zeit in ms/ GPS Längengrad / Breitengrad / Geschwindigkeit /
+     * Beschleunigungssensordaten (X,Y,Z) mit den jeweiligen Mittelwert, Varianz und Standardabweichung /
+     * Gier / Nick Mittelwert / Roll Mittelwert /
+     * Prec.:  timestamp > 0
      * Postc.: Features wurden in eine Datei geschrieben
      */
     private fun saveFeatures(timestamp : Long) {
@@ -785,6 +788,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     if(gpsLocation != null ) {
                         location = gpsLocation?.getLocation()
                     }
+                    Logger.writeToLogger("CameraFragment: captureStillPicture motionPositionSensorData getIsDataGatheringActive: " +
+                            motionPositionSensorData?.getIsDataGatheringActive().toString() + ", Codezeile:" + Exception().getStackTrace()[0].getLineNumber() + "\n")
                     Logger.writeToLogger("CameraFragment: captureStillPicture() onCaptureStarted timestamp: $timestamp \n")
                 }
 
@@ -803,18 +808,18 @@ class CameraFragment : Fragment(), View.OnClickListener,
                                 " / Belichtungszeit: ${result.get(CaptureResult.SENSOR_EXPOSURE_TIME)} " +
                                 "/ Rahmenzeitdauer: ${result.get(CaptureResult.SENSOR_FRAME_DURATION)} / Zeitstempel: ${result.get(CaptureResult.SENSOR_TIMESTAMP)} \n")
                         // Nach der Aufnahme wird der Kamera Zustand auf preview gesetzt
-                        unlockFocus()
+                        setRepeatingPreviewRequest()
                     }
                 }
             }
-            // In diesem Block wird die Konitinuierlich Aufnahme von Bildern abgebrochen und eine Anfrage
-            // gestellt für eine einzelne Aufnahme
+            // In diesem Block wird die Konitinuierlich Aufnahme von Bildern abgebrochen
             captureSession?.apply {
                 stopRepeating()
                 abortCaptures()
-                motionPositionSensorData?.startDataCollection()
-                capture(captureBuilder?.build(), captureCallback, null)
             }
+            motionPositionSensorData?.startDataCollection()
+            captureSession?.capture(captureBuilder?.build(), captureCallback, null)
+
         } catch (e: CameraAccessException) {
             Logger.writeToLogger("CameraFragment: captureStillPicture() CameraAccessException\n")
             Log.e(TAG, e.toString())
@@ -823,8 +828,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
     /**
      * Die Methode wird aufgerufen, nachdem ein einzelnes Foto aufgenommen wurde in der Methode captureStillPicture.
+     * Prec.:
+     * Postc.: Es werden wieder kontinierlich Bilder für die Preview aufgenommen
      */
-    private fun unlockFocus() {
+    private fun setRepeatingPreviewRequest() {
         try {
             state = STATE_PREVIEW
             captureSession?.setRepeatingRequest(previewRequest, captureCallback,

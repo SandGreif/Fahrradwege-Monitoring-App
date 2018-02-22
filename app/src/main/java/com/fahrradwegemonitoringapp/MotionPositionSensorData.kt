@@ -219,6 +219,11 @@ class MotionPositionSensorData : SensorEventListener {
         return null
     }
 
+
+    fun getIsDataGatheringActive() : Boolean {
+        return isDataGatheringActive
+    }
+
     /**
      * Diese Methode startet die Ansammlung von Daten des linearen Beschleunigungssensors
      * Prec.:
