@@ -64,7 +64,7 @@ class GPSLocation(private val activity: Activity)  {
                 }
                 if (providerLastStatus != 2) {
                     Toast.makeText(activity, "LocationListener: Methode: onStatusChanged: Status: " + statusTxt, duration).show()
-                    Logger.writeToLogger("LocationListener: methode: onStatusChanged: status: " + status)
+                    Logger.writeToLogger(Exception().stackTrace[0],"status: " + status)
                 }
                 if (status == 2) {
                     providerLastStatus = 2
@@ -73,12 +73,12 @@ class GPSLocation(private val activity: Activity)  {
 
             override fun onProviderEnabled(provider: String) {
                 Toast.makeText(activity, "LocationListener: Methode: onProviderEnabled: provider: " + provider, duration).show()
-                Logger.writeToLogger("LocationListener: methode: onProviderEnabled: provider: " + provider)
+                Logger.writeToLogger(Exception().stackTrace[0],"provider: " + provider)
             }
 
             override fun onProviderDisabled(provider: String) {
                 Toast.makeText(activity, "LocationListener: Methode: onProviderDisabled: provider: " + provider, duration).show()
-                Logger.writeToLogger("LocationListener: methode: onProviderEnabled: provider: " + provider)
+                Logger.writeToLogger(Exception().stackTrace[0],"provider: " + provider)
             }
         }
 

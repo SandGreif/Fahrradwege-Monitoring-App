@@ -146,9 +146,8 @@ class MotionPositionSensorData : SensorEventListener {
                 } else {
                     lastTimestamp = System.nanoTime()
                 }
-                var azimuth: Float
+                var azimuth: Float = orientationValues[0]
                 val geoField: GeomagneticField
-                azimuth = orientationValues[0]
                 azimuth *= (180 / PI.toFloat())
                 if (location.getLocation() != null) {
                     // Wird benötigt um den magnetischen Norden in welche die Variable azimuth
@@ -241,7 +240,6 @@ class MotionPositionSensorData : SensorEventListener {
      * Postc.: Es werden keine Daten mehr erfasst, wenn isDataGatheringActive true ist.
      */
     fun stopDataCollection() {
-        var result : Long = 0
         if(isDataGatheringActive) {
             isDataGatheringActive = false
         }

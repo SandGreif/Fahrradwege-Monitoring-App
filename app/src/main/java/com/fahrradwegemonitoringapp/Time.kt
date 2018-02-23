@@ -14,7 +14,7 @@ class Time {
 
     /**
      * Prec.: /
-     * Post.: return String in the date form "YEAR_MONTH_DAY_HOUR"
+     * Post.: return String in the date form "YEAR_MONTH_DAY_HOUR_MINUTE"
      */
     fun getDay(): String{
         val year = calendar.get(Calendar.YEAR)
@@ -22,7 +22,23 @@ class Time {
         val day = calendar.get(Calendar.DAY_OF_MONTH)
         val hour = calendar.get(Calendar.HOUR_OF_DAY)
         val minute = calendar.get(Calendar.MINUTE)
-        return "$year" + "_" + "$month" + "_" + "$day" + "_" + "$hour" + "_" + "$minute"
+        return "%d_%d_%d_%d_%d".format(year,month,day,hour,minute)
+    }
+
+    /**
+     * Prec.: /
+     * Post.: return String in the date form "YEAR_MONTH_DAY_HOUR_MINUTE_SECOND_MS"
+     */
+    fun getDayMs(): String{
+        calendar = Calendar.getInstance()
+        val year = calendar.get(Calendar.YEAR)
+        val month = calendar.get(Calendar.MONTH)
+        val day = calendar.get(Calendar.DAY_OF_MONTH)
+        val hour = calendar.get(Calendar.HOUR_OF_DAY)
+        val minute = calendar.get(Calendar.MINUTE)
+        val second = calendar.get(Calendar.SECOND)
+        val ms = calendar.get(Calendar.MILLISECOND)
+        return "%d_%d_%d_%d_%d_%d_%d".format(year,month,day,hour,minute,second,ms)
     }
 
     /**

@@ -234,16 +234,14 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     if (aeState == null || aeState == CaptureResult.CONTROL_AE_STATE_PRECAPTURE
                     || aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
                         state = STATE_WAITING_NON_PRECAPTURE
-                        Logger.writeToLogger("CameraFragment: captureCallback() STATE_WAITING_NON_PRECAPTURE " +
-                                "Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+                        Logger.writeToLogger(Exception().stackTrace[0],"STATE_WAITING_NON_PRECAPTURE")
                     }
                 }
                 STATE_WAITING_NON_PRECAPTURE -> {
                     val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
                     if (aeState == null || aeState != CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
                         state = STATE_PICTURE_TAKEN
-                        Logger.writeToLogger("CameraFragment: captureCallback() STATE_PICTURE_TAKEN " +
-                                " Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+                        Logger.writeToLogger(Exception().stackTrace[0]," STATE_PICTURE_TAKEN")
                         captureStillPicture()
                     }
                 }
@@ -285,16 +283,14 @@ class CameraFragment : Fragment(), View.OnClickListener,
         }
 
         override fun onDisconnected(cameraDevice: CameraDevice) {
-            Logger.writeToLogger("CameraFragment: stateCallback Display onError Codezeile: " +
-                    Exception().stackTrace[0].lineNumber + "\n")
+            Logger.writeToLogger(Exception().stackTrace[0],"Disconnected")
             cameraOpenCloseLock.release()
             cameraDevice.close()
             this@CameraFragment.cameraDevice = null
         }
 
         override fun onError(cameraDevice: CameraDevice, error: Int) {
-            Logger.writeToLogger("CameraFragment: stateCallback onError Codezeile: " +
-                    Exception().stackTrace[0].lineNumber + "\n")
+            Logger.writeToLogger(Exception().stackTrace[0],"onError")
             onDisconnected(cameraDevice)
             this@CameraFragment.activity?.finish()
         }
@@ -328,26 +324,28 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val image = it.acquireLatestImage()
         if (image != null) {
             if (location != null) {
-                speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
-              //  if (((speed - 4.0f) > 0.0001)) {  // bei vorhandener Geschwindigkeit
-                if (imageCounter % (2000 * directoriesCounter) == 0) {
-                    newFolder()
+                if(!motionPositionSensorData?.getIsDataGatheringActive()!!) {
+                    speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
+                    //  if (((speed - 4.0f) > 0.0001)) {  // bei vorhandener Geschwindigkeit
+                    if (imageCounter % (2000 * directoriesCounter) == 0) {
+                        newFolder()
+                    }
+                    saveFeatures(timeMs)
+                    saveImage(image, timeMs)
+                    if (imageCounter % 10 == 0) {
+                        activity.runOnUiThread({
+                            run {
+                                speedTxt.text = "%s %s %d %s".format(df.format(speed), "km/h /", imageCounter, "Bilder")
+                            }
+                        })
+                    }
+                    //  } else {
+                    //    image.close()
+                    //  }
+                } else {
+                    Logger.writeToLogger(Exception().stackTrace[0],"isDataGatheringActive war true")
                 }
-                saveFeatures(timeMs)
-                saveImage(image, timeMs)
-                if (imageCounter % 10 == 0) {
-                    activity.runOnUiThread({
-                        run {
-                            speedTxt.text = "%s %s %d %s".format(df.format(speed), "km/h /", imageCounter, "Bilder")
-                        }
-                    })
-                }
-              //  } else {
-               //    image.close()
-               //  }
             } else {
-                Toast.makeText(activity, "Lokation war null", Toast.LENGTH_SHORT).show()
-                Logger.writeToLogger("Lokation war null \n")
                 image.close()
             }
         }
@@ -464,7 +462,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
     override fun onPause() {
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
-            Logger.writeToLogger("CameraFragment: onPause() wurde aufgerufen Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+            Logger.writeToLogger(Exception().stackTrace[0],"")
         closeCamera()
         stopBackgroundThread()
         super.onPause()
@@ -597,19 +595,16 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val manager = activity.getSystemService(Context.CAMERA_SERVICE) as CameraManager
         try {
             if (!cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
-                Logger.writeToLogger("CameraFragment: openCamera()  cameraOpenCloseLock " +
-                        " Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+                Logger.writeToLogger(Exception().stackTrace[0],"cameraOpenCloseLock")
                 throw RuntimeException("Time out waiting to lock camera opening.")
             }
             if(ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
                 manager.openCamera(cameraId, stateCallback, backgroundHandler)
         } catch (e: CameraAccessException) {
-            Logger.writeToLogger("CameraFragment: openCamera() CameraAccessException " +
-                    " Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+            Logger.writeToLogger(Exception().stackTrace[0],"CameraAccessException")
             Log.e(TAG, e.toString())
         } catch (e: InterruptedException) {
-            Logger.writeToLogger("CameraFragment: openCamera()  InterruptedException " +
-                    "Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+            Logger.writeToLogger(Exception().stackTrace[0],"InterruptedException")
             throw RuntimeException("Interrupted bei der Öffnung der Kamera", e)
         }
 
@@ -617,7 +612,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
     override fun onStop() {
         super.onStop()
-        Logger.writeToLogger("CameraFragment: onStop() wurde aufgerufen Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+        Logger.writeToLogger(Exception().stackTrace[0],"")
         closeCamera()
         motionPositionSensorData?.onStop()
         gpsLocation?.onStop()
@@ -633,8 +628,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
             imageReader?.close()
             imageReader = null
         } catch (e: InterruptedException) {
-            Logger.writeToLogger("CameraFragment: closeCamera() InterruptedException Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
-            throw RuntimeException("Interrupted while trying to lock camera closing.", e)
+            Logger.writeToLogger(Exception().stackTrace[0],"InterruptedException")
+            throw RuntimeException("Interrupt während versucht wurde die Kamera zu schließen", e)
         } finally {
             cameraOpenCloseLock.release()
         }
@@ -658,8 +653,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
             backgroundThread = null
             backgroundHandler = null
         } catch (e: InterruptedException) {
-            Logger.writeToLogger("CameraFragment: stopBackgroundThread() InterruptedException " +
-                    "Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+            Logger.writeToLogger(Exception().stackTrace[0],"InterruptedException")
             Log.e(TAG, e.toString())
         }
 
@@ -693,20 +687,17 @@ class CameraFragment : Fragment(), View.OnClickListener,
                                 captureSession?.setRepeatingRequest(previewRequest,
                                         captureCallback, backgroundHandler)
                             } catch (e: CameraAccessException) {
-                                Logger.writeToLogger("CameraFragment: createCameraPreviewSession() CameraAccessException" +
-                                        " Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+                                Logger.writeToLogger(Exception().stackTrace[0],"CameraAccessException")
                                 Log.e(TAG, e.toString())
                             }
                         }
                         override fun onConfigureFailed(session: CameraCaptureSession) {
                             Toast.makeText(activity, "onConfigure Fehler", Toast.LENGTH_SHORT).show()
-                            Logger.writeToLogger("CameraFragment: createCameraPreviewSession() onConfigureFailed " +
-                                    "Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+                            Logger.writeToLogger(Exception().stackTrace[0],"onConfigureFailed")
                         }
                     }, null)
         } catch (e: CameraAccessException) {
-            Logger.writeToLogger("CameraFragment: createCameraPreviewSession() CameraAccessException" +
-                    " Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+            Logger.writeToLogger(Exception().stackTrace[0],"CameraAccessException")
             Log.e(TAG, e.toString())
         }
     }
@@ -755,8 +746,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
             captureSession?.capture(previewRequestBuilder.build(), captureCallback,
                     backgroundHandler)
         } catch (e: CameraAccessException) {
-            Logger.writeToLogger("CameraFragment: runPrecaptureSequence() CameraAccessException " +
-                    "Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+            Logger.writeToLogger(Exception().stackTrace[0],"CameraAccessException")
             Log.e(TAG, e.toString())
         }
     }
@@ -768,7 +758,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun captureStillPicture() {
         try {
             if (activity == null || cameraDevice == null) {
-                Logger.writeToLogger("CameraFragment: captureStillPicture() gleich null Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+                Logger.writeToLogger(Exception().stackTrace[0],"activity oder cameraDevice glich null")
                 return
             }
             motionPositionSensorData?.clearData() // Vor der Aufnahme werden die letzten erfassten Sensordaten(Beschl./Gier-Roll-Nick) entfernt
@@ -800,14 +790,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     if(gpsLocation != null ) {
                         location = gpsLocation?.getLocation()
                     }
-                    Logger.writeToLogger("CameraFragment: captureStillPicture motionPositionSensorData getIsDataGatheringActive: " +
-                            motionPositionSensorData?.getIsDataGatheringActive().toString() + ", Codezeile:" + Exception().stackTrace[0].lineNumber + "\n")
-                    Logger.writeToLogger("CameraFragment: captureStillPicture() onCaptureStarted timestamp: $timestamp"
-                            + ", Codezeile:" + Exception().stackTrace[0].lineNumber + "\n")
                 }
 
                 override fun onCaptureFailed(session: CameraCaptureSession?, request: CaptureRequest?, failure: CaptureFailure?) {
-                    Logger.writeToLogger("CameraFragment: onCaptureFailed():  $failure \n")
+                    Logger.writeToLogger(Exception().stackTrace[0],"$failure")
                 }
 
                 override fun onCaptureCompleted(session: CameraCaptureSession,
@@ -816,14 +802,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     if(result.frameNumber == frameNumberStart) { // Nur wenn die Frame Nummern übereinstimmen ist dies das einzelne angefragte Bild
                         motionPositionSensorData?.stopDataCollection()
                         exposureTime = result.get(CaptureResult.SENSOR_EXPOSURE_TIME)
-                        Logger.writeToLogger("CameraFragment: captureStillPicture() onCaptureCompleted: Fokusdistanz:  " +
-                                "${result.get(CaptureResult.LENS_FOCUS_DISTANCE)} /  ISO: ${result.get(CaptureResult.SENSOR_SENSITIVITY)} " +
-                                " / Belichtungszeit: ${result.get(CaptureResult.SENSOR_EXPOSURE_TIME)} " +
-                                "/ Rahmenzeitdauer: ${result.get(CaptureResult.SENSOR_FRAME_DURATION)} / Zeitstempel: ${result.get(CaptureResult.SENSOR_TIMESTAMP)} " +
-                                " Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
-                        // Nach der Aufnahme wird der Kamera Zustand auf preview gesetzt
-                        setRepeatingPreviewRequest()
                     }
+                    // Nach der Aufnahme wird der Kamera Zustand auf preview gesetzt
+                    setRepeatingPreviewRequest()
                 }
             }
             // In diesem Block wird die Konitinuierlich Aufnahme von Bildern abgebrochen
@@ -835,7 +816,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
             captureSession?.capture(captureBuilder?.build(), captureCallback, null)
 
         } catch (e: CameraAccessException) {
-            Logger.writeToLogger("CameraFragment: captureStillPicture() CameraAccessException Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
+            Logger.writeToLogger(Exception().stackTrace[0],"CameraAccessException")
             Log.e(TAG, e.toString())
         }
     }
@@ -847,13 +828,15 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     private fun setRepeatingPreviewRequest() {
         try {
-            state = STATE_PREVIEW
-            captureSession?.setRepeatingRequest(previewRequest, captureCallback,
-                    backgroundHandler)
-        } catch (e: CameraAccessException) {
-            Logger.writeToLogger("CameraFragment: unlockFocus() CameraAccessException Codezeile: " + Exception().stackTrace[0].lineNumber + "\n")
-            Log.e(TAG, e.toString())
-        }
+            if (state != STATE_TAKE_PICTURE) {
+                state = STATE_PREVIEW
+                captureSession?.setRepeatingRequest(previewRequest, captureCallback,
+                        backgroundHandler)
+            }
+            } catch (e: CameraAccessException) {
+                Logger.writeToLogger(Exception().stackTrace[0], e.toString())
+                Log.e(TAG, e.toString())
+            }
     }
 
     private fun takePictures() : Boolean {
@@ -984,9 +967,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 bigEnough.size > 0 -> Collections.min(bigEnough, CompareSizesByArea())
                 notBigEnough.size > 0 -> max(notBigEnough, CompareSizesByArea())
                 else -> {
-                    Logger.writeToLogger("CameraFragment: chooseOptimalSize()  keine passende preview groeße Codezeile: " +
-                            Exception().stackTrace[0].lineNumber + "\n")
-                    Log.e(TAG, "Es konnte keine passende preview groeße gefunden werden")
+                    Logger.writeToLogger(Exception().stackTrace[0],"keine passende Preview-Groeße gefunden")
+                    Log.e(TAG, "Es konnte keine passende Preview-Groeße gefunden werden")
                     choices[0]
                 }
             }
