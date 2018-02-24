@@ -66,9 +66,15 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     private lateinit var cameraId: String
 
+    /**
+     * Gibt an ob der Nutzer möchte das Daten weiterhin erfasst werden
+     */
     @Volatile private var buttonCaptureRequestActive : Boolean = false
 
-    private var  activeImageCapturing : Boolean = false
+    /**
+     * True wenn aktuell Bilder angefragt und verarbeitet werden
+     */
+    @Volatile private var  activeImageCapturing : Boolean = false
 
     /**
      * Um die aktuelle Geschwindigkeit für den Nutzer sichtbar zu machen
