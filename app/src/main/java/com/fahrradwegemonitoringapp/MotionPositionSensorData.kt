@@ -3,6 +3,7 @@ package com.fahrradwegemonitoringapp
 import android.app.Activity
 import android.content.Context
 import android.hardware.*
+import android.widget.Toast
 import java.math.RoundingMode
 import java.text.DecimalFormat
 import java.util.concurrent.*
@@ -39,10 +40,13 @@ class MotionPositionSensorData : SensorEventListener {
 
     /**
      *  In diesen Variablen stehen die Kallibrierungsoffsets für
-     *  Roll und Nick Winkel
+     *  Roll und Nick Winkel sowie die Beschleunigungssensorachsen X,Y,Z
      */
-    private var pitchOffset: Float = 0.0f
-    private var rollOffset: Float = 0.0f
+    private var pitchOffset : Float = 0.0f
+    private var rollOffset : Float = 0.0f
+    private var xOffset : Float = 0.0f
+    private var yOffset : Float = 0.0f
+    private var zOffset : Float = 0.0f
 
     // Current data from accelerometer & magnetometer.  The arrays hold values
     // for X, Y, and Z.
@@ -119,6 +123,29 @@ class MotionPositionSensorData : SensorEventListener {
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        if (sensor != null) {
+            if(sensor.type  == Sensor.TYPE_MAGNETIC_FIELD) {
+                when(accuracy) {
+                    // Genauigkeit ist Unzuverlaessig
+                    0 -> {
+                        Toast.makeText(activity, "Magnetsensor Genauigkeit: unzuverlässig", Toast.LENGTH_SHORT).show()
+                        Logger.writeToLogger(Exception().stackTrace[0],"Magnetsensor Genauigkeit: SENSOR_STATUS_UNRELIABLE\n")
+                    }
+                    1 -> {
+                        Toast.makeText(activity, "Magnetsensor Genauigkeit: niedrig", Toast.LENGTH_SHORT).show()
+                        Logger.writeToLogger(Exception().stackTrace[0],"Magnetsensor Genauigkeit: SENSOR_STATUS_ACCURACY_LOW\n")
+                    }
+                    2 -> {
+                        Toast.makeText(activity, "Magnetsensor Genauigkeit: mittel", Toast.LENGTH_SHORT).show()
+                        Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensor Genauigkeit: SENSOR_STATUS_ACCURACY_MEDIUM\n")
+                    }
+                    3 -> {
+                        Toast.makeText(activity, "Magnetsensor Genauigkeit: hoch", Toast.LENGTH_SHORT).show()
+                        Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensor Genauigkeit: SENSOR_STATUS_ACCURACY_HIGH\n")
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -175,6 +202,7 @@ class MotionPositionSensorData : SensorEventListener {
             val gravityTemp = FloatArray(3)
             val orientationTemp = FloatArray(3)
             val xyzAxisTemp = FloatArray(3)
+
             val rotationOK = SensorManager.getRotationMatrix(rotationMatrix,
                     null, mAccelerometerData, mMagnetometerData)
             // Gibt die Orientierung des Smartphones in der Gier-Nick-Roll Form zurück
@@ -183,11 +211,25 @@ class MotionPositionSensorData : SensorEventListener {
                 SensorManager.getOrientation(rotationMatrix,
                         orientationValues)
             }
+            var azimuth: Float = orientationValues[0]
+            val geoField: GeomagneticField
+            azimuth *= (180 / PI.toFloat())
+            if (location.getLocation() != null) {
+                // Wird benötigt um den magnetischen Norden in welche die Variable azimuth
+                // zeigt in den geografischen Norden zu konvertieren
+                geoField = GeomagneticField(location.getLocation()!!.latitude.toFloat(),
+                        location.getLocation()!!.longitude.toFloat(),
+                        location.getLocation()!!.altitude.toFloat(),
+                        System.currentTimeMillis())
+                azimuth += geoField.declination // Berechnet den geografischen Norden zu den magnetischen Norden
+            }
+
             // Anwendung eines einfachen Tiefpassfilters, um den Gravitationsanteil
             // aus den Beschleunigungssensordaten zu entfernen
             gravityTemp[0] = alpha * gravity[0] + (1 - alpha) * event.values[0]
             gravityTemp[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
             gravityTemp[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
+
 
             if (isDataGatheringActive) {
                 if (firstGathering) {
@@ -196,24 +238,13 @@ class MotionPositionSensorData : SensorEventListener {
                 } else {
                     lastTimestamp = System.nanoTime()
                 }
-                var azimuth: Float = orientationValues[0]
-                val geoField: GeomagneticField
-                azimuth *= (180 / PI.toFloat())
-                if (location.getLocation() != null) {
-                    // Wird benötigt um den magnetischen Norden in welche die Variable azimuth
-                    // zeigt in den geografischen Norden zu konvertieren
-                    geoField = GeomagneticField(location.getLocation()!!.latitude.toFloat(),
-                            location.getLocation()!!.longitude.toFloat(),
-                            location.getLocation()!!.altitude.toFloat(),
-                            System.currentTimeMillis())
-                    azimuth += geoField.declination // Berechnet den geografischen Norden zu den magnetischen Norden
-                }
                 orientationTemp[0] = azimuth
                 orientationTemp[1] = orientationValues[1] - pitchOffset
                 orientationTemp[2] = orientationValues[2] - rollOffset
-                xyzAxisTemp[0] = event.values[0] - gravityTemp[0]
-                xyzAxisTemp[1] = event.values[1] - gravityTemp[1]
-                xyzAxisTemp[2] = event.values[2] - gravityTemp[2]
+                // Von den Beschleunigungssensordaten wird der Gravitationsanteil und Kallibrierungsoffset subtrahiert
+                xyzAxisTemp[0] = event.values[0] - gravityTemp[0] - xOffset
+                xyzAxisTemp[1] = event.values[1] - gravityTemp[1] - yOffset
+                xyzAxisTemp[2] = event.values[2] - gravityTemp[2] - zOffset
             }
             return DataValuesElement(isDataGatheringActive, gravityTemp, orientationTemp, xyzAxisTemp)
         }
@@ -267,20 +298,20 @@ class MotionPositionSensorData : SensorEventListener {
                 val varianceZ = calculateVariance(meanZ, zListFinish)
                 val standardDevZ = calculateStandardDeviation(varianceZ)
                 // Berechne Mittelwert für Gier-Nick-Roll
-                var angelAzimuth = calculateAngelChangeAzimuth(azimuthListFinish)
-                angelAzimuth *= (PI.toFloat() / 180)
+                var radAzimuth = calculateAngelChangeAzimuth(azimuthListFinish)
+                radAzimuth *= (PI.toFloat() / 180)
                 val meanPitch = calculateMean(pitchListFinish)
                 val variancePitch = calculateVariance(meanPitch, pitchListFinish)
                 val standardPitch = calculateStandardDeviation(variancePitch)
                 val meanRoll = calculateMean(rollListFinish)
                 val varianceRoll = calculateVariance(meanRoll, rollListFinish)
                 val standardRoll = calculateStandardDeviation(varianceRoll)
-            // Representation der erfassten Daten als String. Kommas werden durch Punkte ersetzt.
+                // Representation der erfassten Daten als String. Kommas werden durch Punkte ersetzt.
                 return df.format(meanX).replace(',', '.') + "," + df.format(varianceX).replace(',', '.') + "," +
                         df.format(standardDevX).replace(',', '.') + "," + df.format(meanY).replace(',', '.') + "," +
                         df.format(varianceY).replace(',', '.') + "," + df.format(standardDevY).replace(',', '.') + "," +
                         df.format(meanZ).replace(',', '.') + "," + df.format(varianceZ).replace(',', '.') + "," +
-                        df.format(standardDevZ).replace(',', '.') + "," + df.format(angelAzimuth).replace(',', '.') + "," +
+                        df.format(standardDevZ).replace(',', '.') + "," + df.format(radAzimuth).replace(',', '.') + "," +
                         df.format(meanPitch).replace(',', '.') + "," + df.format(variancePitch).replace(',', '.') + "," +
                         df.format(standardPitch).replace(',', '.') + "," + df.format(meanRoll).replace(',', '.') + "," +
                         df.format(varianceRoll).replace(',', '.') + "," + df.format(standardRoll).replace(',', '.')
@@ -455,6 +486,9 @@ class MotionPositionSensorData : SensorEventListener {
      */
     fun stopCalibration() {
         isDataGatheringActive = false
+        xOffset =calculateMean(xAxisList?.toMutableList())
+        yOffset = calculateMean(yAxisList?.toMutableList())
+        zOffset = calculateMean(zAxisList?.toMutableList())
         pitchOffset = calculateMean(pitchList?.toMutableList())
         rollOffset = calculateMean(rollList?.toMutableList())
     }

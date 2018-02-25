@@ -380,7 +380,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val accelerometerString = motionPositionSensorData?.getData()
         fileLocation.appendText("$timestamp,$latitude,$longitude," +
                 "$speed,$accelerometerString,${motionPositionSensorData?.getFirstTimestamp()}," +
-                "$exposureTimeStart,$exposureTime,${motionPositionSensorData?.getLastTimestamp()} \n")
+                "$exposureTimeStart,$exposureTime,${motionPositionSensorData?.getLastTimestamp()}\n")
     }
 
     /**
