@@ -808,9 +808,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     if(result.frameNumber == frameNumberStart) { // Nur wenn die Frame Nummern übereinstimmen ist dies das einzelne angefragte Bild
                         motionPositionSensorData?.stopDataCollection()
                         exposureTime = result.get(CaptureResult.SENSOR_EXPOSURE_TIME)
+                        // Nach der Aufnahme wird der Kamera Zustand auf preview gesetzt
+                        setRepeatingPreviewRequest()
                     }
-                    // Nach der Aufnahme wird der Kamera Zustand auf preview gesetzt
-                    setRepeatingPreviewRequest()
                 }
             }
             // In diesem Block wird die Konitinuierlich Aufnahme von Bildern abgebrochen
