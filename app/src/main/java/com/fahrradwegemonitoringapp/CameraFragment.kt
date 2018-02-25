@@ -409,7 +409,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         fileLocation = File(actualDirectory, ("features.csv"))
         fileLocation.appendText("Zeitstempel,Breitengrad,Laengengrad,Geschwindigkeit," +
                 "MittelWX,VarianzX,StandardAX,MittelWY,VarianzY,StandardAY,MittelWZ,VarianzZ,StandardAZ," +
-                "Azimuth,MittelWPitch,VarianzPitch,StandardAPitch,MittelWRoll,VarianzRoll,StandardRoll,StartBewegungsD,StartBelichtung,Belichtungszeit,StopBewegungsD \n")
+                "Azimuth,MittelWPitch,VarianzPitch,StandardAPitch,MittelWRoll,VarianzRoll,StandardRoll,StartBewegungsD,StartBelichtung,Belichtungszeit,StopBewegungsD\n")
     }
 
     override fun onCreateView(inflater: LayoutInflater,
