@@ -378,9 +378,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val latitude = location?.latitude?.toFloat()
         val longitude = location?.longitude?.toFloat()
         val accelerometerString = motionPositionSensorData?.getData()
-        fileLocation.appendText("$timestamp,$latitude,$longitude," +
-                "$speed,$accelerometerString,${motionPositionSensorData?.getFirstTimestamp()}," +
-                "$exposureTimeStart,$exposureTime,${motionPositionSensorData?.getLastTimestamp()}\n")
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+                "$timestamp","$latitude","$longitude","$speed","$accelerometerString","${motionPositionSensorData?.getFirstTimestamp()}",
+                "$exposureTimeStart","$exposureTime","${motionPositionSensorData?.getLastTimestamp()}"))
     }
 
     /**
@@ -407,9 +407,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("features.csv"))
-        fileLocation.appendText("Zeitstempel,Breitengrad,Laengengrad,Geschwindigkeit," +
-                "MittelWX,VarianzX,StandardAX,MittelWY,VarianzY,StandardAY,MittelWZ,VarianzZ,StandardAZ," +
-                "Azimuth,MittelWPitch,VarianzPitch,StandardAPitch,MittelWRoll,VarianzRoll,StandardRoll,StartBewegungsD,StartBelichtung,Belichtungszeit,StopBewegungsD\n")
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+                "Zeitstempel","Breitengrad","Laengengrad","Geschwindigkeit","MittelWX","VarianzX","StandardAX","MittelWY",
+                "VarianzY","StandardAY","MittelWZ","VarianzZ","StandardAZ","Azimuth","MittelWPitch","VarianzPitch",
+                "StandardAPitch","MittelWRoll","VarianzRoll","StandardRoll","StartBewegungsD","StartBelichtung","Belichtungszeit","StoppBewegungsD"))
     }
 
     override fun onCreateView(inflater: LayoutInflater,
