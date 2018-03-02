@@ -42,15 +42,26 @@
         android:id="@+id/speedTxt"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_marginBottom="82dp"
-        android:layout_marginEnd="16dp"
+        android:layout_below="@+id/toggleButtonStart"
+        android:layout_marginEnd="59dp"
+        android:layout_marginTop="16dp"
         android:layout_toStartOf="@+id/toggleButtonStart"
-        android:fontFamily="cursive"
+        android:fontFamily="sans-serif-condensed"
         android:text="@string/speedTxt"
         android:textColor="?android:attr/colorBackground"
-        android:textSize="24sp"
-        android:textStyle="bold|italic" />
+        android:textSize="24sp" />
+
+    <TextView
+        android:id="@+id/imageCounterTxt"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/toggleButtonCalibration"
+        android:layout_alignStart="@+id/speedTxt"
+        android:layout_marginBottom="8dp"
+        android:fontFamily="sans-serif-condensed"
+        android:text="@string/imageCounterTxt"
+        android:textColor="?android:attr/colorBackground"
+        android:textSize="24sp" />
 
     <ToggleButton
         android:id="@+id/toggleButtonStart"

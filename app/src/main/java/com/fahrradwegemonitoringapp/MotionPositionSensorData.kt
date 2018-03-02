@@ -6,7 +6,6 @@ import android.hardware.*
 import android.widget.Toast
 import java.math.RoundingMode
 import java.text.DecimalFormat
-import java.util.concurrent.*
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -85,13 +84,6 @@ class MotionPositionSensorData : SensorEventListener {
     private lateinit var location : GPSLocation
 
     /**
-     * Für die Verwaltung eines Threadpools
-     */
-    private lateinit var executor : ExecutorService
-
-    private lateinit var threadOrderedPool : CompletionService<DataValuesElement>
-
-    /**
      * Diese Methode muss aufgerufen werden, um die Sensor Listener zu starten
      * Prec.: activity != null
      * Postc.: Listener wurden initialisiert
@@ -101,8 +93,6 @@ class MotionPositionSensorData : SensorEventListener {
         df.roundingMode = RoundingMode.CEILING
         this.activity = activity
         this.location = location
-        executor = Executors.newFixedThreadPool(6)
-        threadOrderedPool = ExecutorCompletionService<DataValuesElement>(executor)
         mSensorManager = activity.getSystemService(Context.SENSOR_SERVICE) as SensorManager?
         mAccelerometer = mSensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         mSensorManager?.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_FASTEST)
@@ -148,120 +138,57 @@ class MotionPositionSensorData : SensorEventListener {
      */
     fun onStop() {
         mSensorManager!!.unregisterListener(this)
-        executor.shutdown()
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
-        if (event != null) {
-            val dataValues : DataValuesElement
-            val sensorType = event.sensor.type
-            when (sensorType) {
-                Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
-                Sensor.TYPE_MAGNETIC_FIELD -> mMagnetometerData = event.values.clone()
-            }
-            // Nur bei Beschleunigungssensordaten wird mit den Datenwerten weiter gerechnet ..
-            if (sensorType == Sensor.TYPE_ACCELEROMETER) {
-                // .. mit Hilfe eines Threadpools und einer Warteschlange, um die Ergebnisse
-                // in der richtigen Reihenfolge zu erhalten
-                threadOrderedPool.submit(SensorMotionCalculator(event))
-                // Dequeue das nächste Ergebnis
-                dataValues =threadOrderedPool.take().get()
-                gravity[0] = dataValues.getGravity()[0]
-                gravity[1] = dataValues.getGravity()[1]
-                gravity[2] = dataValues.getGravity()[2]
-                // Nur wenn die Datenerfassung von Sensordaten angefragt wird
-                if(dataValues.getWasGatheringActive()) {
-                    timestampsList?.add(dataValues.getTimestamp())
-                    azimuthList?.add(dataValues.getOrientationData()[0])
-                    pitchList?.add(dataValues.getOrientationData()[1] - pitchOffset)
-                    rollList?.add(dataValues.getOrientationData()[2] - rollOffset)
-                    xAxisList?.add(dataValues.getXyzAxis()[0])
-                    yAxisList?.add(dataValues.getXyzAxis()[1])
-                    zAxisList?.add(dataValues.getXyzAxis()[2])
+        val timestamp = System.nanoTime()
+            if (event != null) {
+                val sensorType = event.sensor.type
+                when (sensorType) {
+                    Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
+                    Sensor.TYPE_MAGNETIC_FIELD -> mMagnetometerData = event.values.clone()
+                }
+                if (sensorType == Sensor.TYPE_ACCELEROMETER) {
+                    // Berechnet die Rotationsmatrix. Dabei werden die Beschleunigungssensordaten und
+                    // Magnetsensordaten genutzt, um die Smartphone spezifischen Koordinaten auf die Welt Koordinaten
+                    // zu transformieren
+                    val rotationMatrix = FloatArray(9)
+                    val rotationOK = SensorManager.getRotationMatrix(rotationMatrix,
+                            null, mAccelerometerData, mMagnetometerData)
+                    // Gibt die Orientierung des Smartphones in der Gier-Nick-Roll Form zurück
+                    val orientationValues = FloatArray(3)
+                    if (rotationOK) {
+                        SensorManager.getOrientation(rotationMatrix, orientationValues)
+                    }
+                    // Anwendung eines einfachen Tiefpassfilters, um den Gravitationsanteil
+                    // aus den Beschleunigungssensordaten zu entfernen
+                    gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0]
+                    gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
+                    gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
+                    if (isDataGatheringActive) {
+                        var azimuth: Float = orientationValues[0]
+                        val geoField: GeomagneticField
+                        azimuth *= (180 / PI.toFloat())
+                        if (location.getLocation() != null) {
+                            // Wird benötigt um den magnetischen Norden in welche die Variable azimuth
+                            // zeigt in den geografischen Norden zu konvertieren
+                            geoField = GeomagneticField(location.getLocation()!!.latitude.toFloat(),
+                                    location.getLocation()!!.longitude.toFloat(),
+                                    location.getLocation()!!.altitude.toFloat(),
+                                    System.currentTimeMillis())
+                            azimuth += geoField.declination // Berechnet den magnetischen Norden zu den geografischen Norden
+                        }
+                        timestampsList?.add(System.nanoTime())
+                        azimuthList?.add(azimuth)
+                        pitchList?.add(orientationValues[1] - pitchOffset)
+                        rollList?.add(orientationValues[2] - rollOffset)
+                        xAxisList?.add(event.values[0] - gravity[0] - xOffset)
+                        yAxisList?.add(event.values[1] - gravity[1] - yOffset)
+                        zAxisList?.add(event.values[2] - gravity[2] - zOffset)
+                        timestampsList?.add(timestamp)
+                    }
                 }
             }
-        }
-    }
-
-
-    /**
-     * In dieser inneren Klasse werden die Beschleunigungsdaten X,Y,Z berechnet und
-     * die Roll-Nick-Gier Winkel.
-     *
-     */
-    inner class SensorMotionCalculator (private val event: SensorEvent) : Callable<DataValuesElement> {
-        override fun call(): DataValuesElement {
-            // Berechnet die Rotationsmatrix. Dabei werden die Beschleunigungssensordaten und
-            // Magnetsensordaten genutzt, um die Smartphone spezifischen Koordinaten auf die Welt Koordinaten
-            // zu transformieren
-            val timestamp = System.nanoTime()
-            val rotationMatrix = FloatArray(9)
-            val gravityTemp = FloatArray(3)
-            val orientationTemp = FloatArray(3)
-            val xyzAxisTemp = FloatArray(3)
-
-            val rotationOK = SensorManager.getRotationMatrix(rotationMatrix,
-                    null, mAccelerometerData, mMagnetometerData)
-            // Gibt die Orientierung des Smartphones in der Gier-Nick-Roll Form zurück
-            val orientationValues = FloatArray(3)
-            if (rotationOK) {
-                SensorManager.getOrientation(rotationMatrix,
-                        orientationValues)
-            }
-            var azimuth: Float = orientationValues[0]
-            val geoField: GeomagneticField
-            azimuth *= (180 / PI.toFloat())
-            if (location.getLocation() != null) {
-                // Wird benötigt um den magnetischen Norden in welche die Variable azimuth
-                // zeigt in den geografischen Norden zu konvertieren
-                geoField = GeomagneticField(location.getLocation()!!.latitude.toFloat(),
-                        location.getLocation()!!.longitude.toFloat(),
-                        location.getLocation()!!.altitude.toFloat(),
-                        System.currentTimeMillis())
-                azimuth += geoField.declination // Berechnet den geografischen Norden zu den magnetischen Norden
-            }
-
-            // Anwendung eines einfachen Tiefpassfilters, um den Gravitationsanteil
-            // aus den Beschleunigungssensordaten zu entfernen
-            gravityTemp[0] = alpha * gravity[0] + (1 - alpha) * event.values[0]
-            gravityTemp[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
-            gravityTemp[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
-
-
-            if (isDataGatheringActive) {
-                orientationTemp[0] = azimuth
-                orientationTemp[1] = orientationValues[1] - pitchOffset
-                orientationTemp[2] = orientationValues[2] - rollOffset
-                // Von den Beschleunigungssensordaten wird der Gravitationsanteil und Kallibrierungsoffset subtrahiert
-                xyzAxisTemp[0] = event.values[0] - gravityTemp[0] - xOffset
-                xyzAxisTemp[1] = event.values[1] - gravityTemp[1] - yOffset
-                xyzAxisTemp[2] = event.values[2] - gravityTemp[2] - zOffset
-            }
-            return DataValuesElement(isDataGatheringActive, gravityTemp, orientationTemp, xyzAxisTemp, timestamp)
-        }
-    }
-
-    /**
-     * Ein Datenobjekt um mehrere Rückgabewerte für den Callable SensorMotionCalculator zu ermöglichen:
-     */
-    companion object class DataValuesElement(private val wasGatheringActive :  Boolean, private val gravity : FloatArray,
-                                             private val orientationData : FloatArray, private val xyzAxis :
-                                                 FloatArray, private val timestamp : Long) {
-        fun getWasGatheringActive() : Boolean {
-            return wasGatheringActive
-        }
-        fun getGravity() : FloatArray {
-            return gravity
-        }
-        fun getOrientationData() : FloatArray {
-            return orientationData
-        }
-        fun getXyzAxis() : FloatArray {
-            return xyzAxis
-        }
-        fun getTimestamp() : Long {
-            return timestamp
-        }
     }
 
     /*

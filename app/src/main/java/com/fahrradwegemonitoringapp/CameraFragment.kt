@@ -82,6 +82,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private lateinit var speedTxt : TextView
 
     /**
+     * Um die Anzahl der aufgenommenen Bilder für den Nutzer sichtbar zu machen
+     */
+    private lateinit var imageCounterTxt : TextView
+
+    /**
      * Anzahl der gespeicherten Bilder
      */
     private var imageCounter : Int = 0
@@ -273,6 +278,14 @@ class CameraFragment : Fragment(), View.OnClickListener,
         override fun onCaptureCompleted(session: CameraCaptureSession,
                                         request: CaptureRequest,
                                         result: TotalCaptureResult) {
+            if(gpsLocation?.getLocation() != null) { // Geschwindigkeit auf dem UI ausgeben
+                val speedOnComplete = (gpsLocation!!.getLocation()?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
+                activity.runOnUiThread({
+                    run {
+                        speedTxt.text = "%s %s".format(df.format(speedOnComplete), " km/h")
+                    }
+                })
+            }
             process(result)
         }
     }
@@ -338,13 +351,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     }
                     saveFeatures(timeMs)
                     saveImage(image, timeMs)
-                    if (imageCounter % 10 == 0) {
-                        activity.runOnUiThread({
-                            run {
-                                speedTxt.text = "%s %s %d %s".format(df.format(speed), "km/h /", imageCounter, "Bilder")
-                            }
-                        })
-                    }
+                    activity.runOnUiThread({
+                        run {
+                            imageCounterTxt.text = "%d %s".format(imageCounter, "Bilder")
+                            speedTxt.text = "%s %s".format(df.format(speed), " km/h")
+                        }
+                    })
                     //  } else {
                     //    image.close()
                     //  }
@@ -438,7 +450,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
         fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "Zeitstempel","Breitengrad","Laengengrad","Geschwindigkeit","MittelX","VarianzX","StandardabweichungX","MittelY",
                 "VarianzY","StandardabweichungY","MittelZ","VarianzZ","StandardabweichungZ","Azimuth","MittelPitch","VarianzPitch",
-                "StandardabweichungPitch","MittelRoll","VarianzRoll","StandardabweichungRoll","Messwerte","StartBewegungsD","StartBelichtung","Belichtungszeit"))
+                "StandardabweichungPitch","MittelRoll","VarianzRoll","StandardabweichungRoll","Messwerte",
+                "StartBewegungsD","StartBelichtung","Belichtungszeit"))
     }
 
     override fun onCreateView(inflater: LayoutInflater,
@@ -448,6 +461,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         textureView = view.findViewById(R.id.texture)
+        imageCounterTxt = view.findViewById(R.id.imageCounterTxt) as TextView
         speedTxt = view.findViewById(R.id.speedTxt) as TextView
         val toggleButton = view.findViewById(R.id.toggleButtonStart) as ToggleButton
         val toggleButtonCalibration = view.findViewById(R.id.toggleButtonCalibration) as ToggleButton
