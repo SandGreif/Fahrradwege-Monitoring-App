@@ -142,7 +142,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     /**
      * Die Belichtungszeit der letzten Aufnahme
      */
-    private var exposureTime: Long = 0
+    @Volatile private var exposureTime: Long = 0
 
     /**
      * Die Belichtungsstartzeit der letzten Aufnahme in Nanosekunden seit Start der Java Virtual Machine(JVM).
@@ -330,7 +330,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val image = it.acquireLatestImage()
         if (image != null) {
             if (location != null) {
-                if(!motionPositionSensorData?.getIsDataGatheringActive()!!) {
+                if(stopDataCapturing()) {
                     speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
                     //  if (((speed - 4.0f) > 0.0001)) {  // bei vorhandener Geschwindigkeit
                     if (imageCounter % (2000 * directoriesCounter) == 0) {
@@ -349,13 +349,39 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     //    image.close()
                     //  }
                 } else {
-                    Logger.writeToLogger(Exception().stackTrace[0],"isDataGatheringActive war true")
+                    Logger.writeToLogger(Exception().stackTrace[0],"Belichtungszeit war 0")
+                    image.close()
                 }
             } else {
                 image.close()
             }
         }
         requestNextImage()
+    }
+
+    /**
+     * Stoppt die erfassung der Bewegungssensor und Positionsdaten
+     * Prec.: sollte aufgerufen werden von der Methode onImageAvailableListener
+     * Postc.: Datenerfassung gestoppt. Rückgabewert True, wenn Belichtungszeit größer als 0
+     *        Die Belichtung kann 0 sein, wenn der Listener onImageAvailableListener vor den
+     *        Handler onCaptureComplete aufgerufen wurde
+     */
+    private fun stopDataCapturing() : Boolean {
+        var exposerTimeGreaterZero = false
+        // Die verstrichene Zeit muss mindestens der MAX_EXPOSURE_TIME entsprechen
+        if(System.nanoTime() - exposureTimeStart + exposureTime < MAX_EXPOSURE_TIME) {
+            // Ausreichend Zeit für die Bewegungssensordatenerfassung gewährleisten
+            try {
+                Thread.sleep(MAX_EXPOSURE_TIME -(System.nanoTime() - exposureTimeStart + exposureTime))
+            } catch (e: IllegalArgumentException) {
+                Logger.writeToLogger(Exception().stackTrace[0],e.toString())
+            }
+        }
+        motionPositionSensorData?.stopDataCollection()
+        if(exposureTime > 0) {
+            exposerTimeGreaterZero =  true
+        }
+        return exposerTimeGreaterZero
     }
 
     /**
@@ -377,10 +403,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun saveFeatures(timestamp : Long) {
         val latitude = location?.latitude?.toFloat()
         val longitude = location?.longitude?.toFloat()
-        val accelerometerString = motionPositionSensorData?.getData()
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
-                "$timestamp","$latitude","$longitude","$speed","$accelerometerString","${motionPositionSensorData?.getFirstTimestamp()}",
-                "$exposureTimeStart","$exposureTime","${motionPositionSensorData?.getLastTimestamp()}"))
+        val accelerometerString = motionPositionSensorData?.getData(exposureTimeStart,exposureTime)
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+                "$timestamp","$latitude","$longitude","$speed","$accelerometerString",
+                "${motionPositionSensorData?.getFirstTimestamp()}",
+                "$exposureTimeStart","$exposureTime"))
     }
 
     /**
@@ -388,6 +415,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Postc.: Wenn actualTakingPictures wahr ist wurde die Methode actualTakingPictures aufgerufen
      */
     private fun requestNextImage() {
+        exposureTime = 0
         if(buttonCaptureRequestActive) {
             state = STATE_TAKE_PICTURE
         } else {
@@ -408,9 +436,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("features.csv"))
         fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
-                "Zeitstempel","Breitengrad","Laengengrad","Geschwindigkeit","MittelWX","VarianzX","StandardAX","MittelWY",
-                "VarianzY","StandardAY","MittelWZ","VarianzZ","StandardAZ","Azimuth","MittelWPitch","VarianzPitch",
-                "StandardAPitch","MittelWRoll","VarianzRoll","StandardRoll","StartBewegungsD","StartBelichtung","Belichtungszeit","StoppBewegungsD"))
+                "Zeitstempel","Breitengrad","Laengengrad","Geschwindigkeit","MittelX","VarianzX","StandardabweichungX","MittelY",
+                "VarianzY","StandardabweichungY","MittelZ","VarianzZ","StandardabweichungZ","Azimuth","MittelPitch","VarianzPitch",
+                "StandardabweichungPitch","MittelRoll","VarianzRoll","StandardabweichungRoll","Messwerte","StartBewegungsD","StartBelichtung","Belichtungszeit"))
     }
 
     override fun onCreateView(inflater: LayoutInflater,
@@ -807,7 +835,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
                                                 request: CaptureRequest,
                                                 result: TotalCaptureResult) {
                     if(result.frameNumber == frameNumberStart) { // Nur wenn die Frame Nummern übereinstimmen ist dies das einzelne angefragte Bild
-                        motionPositionSensorData?.stopDataCollection()
                         exposureTime = result.get(CaptureResult.SENSOR_EXPOSURE_TIME)
                         // Nach der Aufnahme wird der Kamera Zustand auf preview gesetzt
                         setRepeatingPreviewRequest()

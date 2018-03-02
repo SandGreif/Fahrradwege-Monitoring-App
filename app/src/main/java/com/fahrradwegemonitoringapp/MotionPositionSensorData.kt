@@ -17,6 +17,7 @@ import kotlin.math.sqrt
  *  Genutzt werden die daten des "Accelerometer" und des "Magnetic Field" Sensors. Die Beschleunigungssensordaten
  *  beinhalten die Beschleunigungsdaten mit Gravitationsdaten. Die Berechnung von Gier Nick Roll kommt aus diesem Tutorial:
  *  https://github.com/google-developer-training/android-advanced/tree/master/TiltSpot
+ *  Durch ein Zeitfenster wird die länge der Datenerfassung bestimmt.
  * Von Julian Magierski am 13.02.2018 erstellt.
  */
 
@@ -37,6 +38,12 @@ class MotionPositionSensorData : SensorEventListener {
     private var azimuthList: MutableList<Float>? = null
     private var pitchList: MutableList<Float>? = null
     private var rollList: MutableList<Float>? = null
+
+
+    /**
+     * Zeitstempel innerhalb eines Zeitfensters,
+     */
+    private var timestampsList: MutableList<Long>? = null
 
     /**
      *  In diesen Variablen stehen die Kallibrierungsoffsets für
@@ -73,19 +80,6 @@ class MotionPositionSensorData : SensorEventListener {
     @Volatile private var isDataGatheringActive : Boolean = false
 
     /**
-     * Gibt an ob innerhalb einer Datenerfassungs-Routine noch keone Sensordaten erfasst wurden
-     */
-    @Volatile private var firstGathering : Boolean = true
-
-    /**
-     * firstTimestamp gibt den Zeitstempel an der ersten Datenerfassung innerhalb eines Fensters.
-     * Innerhalb eines Fensters werden mehrere Daten erfasst zwischen startDataCollection und stopDataCollection.
-     * lastTimestamp der letzte erfasste Zeitstempel zu einem Event in einem Fenster.
-     */
-    private var firstTimestamp : Long = 0
-    private var lastTimestamp : Long = 0
-
-    /**
      * Wird benötigt um die Richtung des  geomagnetischen Nordpols zu bestimmen
      */
     private lateinit var location : GPSLocation
@@ -120,13 +114,14 @@ class MotionPositionSensorData : SensorEventListener {
         azimuthList = mutableListOf()
         pitchList = mutableListOf()
         rollList = mutableListOf()
+        timestampsList = mutableListOf()
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
         if (sensor != null) {
             if(sensor.type  == Sensor.TYPE_MAGNETIC_FIELD) {
                 when(accuracy) {
-                    // Genauigkeit ist Unzuverlaessig
+                // Genauigkeit ist Unzuverlaessig
                     0 -> {
                         Toast.makeText(activity, "Magnetsensor Genauigkeit: unzuverlässig", Toast.LENGTH_SHORT).show()
                         Logger.writeToLogger(Exception().stackTrace[0],"Magnetsensor Genauigkeit: SENSOR_STATUS_UNRELIABLE\n")
@@ -176,6 +171,7 @@ class MotionPositionSensorData : SensorEventListener {
                 gravity[2] = dataValues.getGravity()[2]
                 // Nur wenn die Datenerfassung von Sensordaten angefragt wird
                 if(dataValues.getWasGatheringActive()) {
+                    timestampsList?.add(dataValues.getTimestamp())
                     azimuthList?.add(dataValues.getOrientationData()[0])
                     pitchList?.add(dataValues.getOrientationData()[1] - pitchOffset)
                     rollList?.add(dataValues.getOrientationData()[2] - rollOffset)
@@ -198,6 +194,7 @@ class MotionPositionSensorData : SensorEventListener {
             // Berechnet die Rotationsmatrix. Dabei werden die Beschleunigungssensordaten und
             // Magnetsensordaten genutzt, um die Smartphone spezifischen Koordinaten auf die Welt Koordinaten
             // zu transformieren
+            val timestamp = System.nanoTime()
             val rotationMatrix = FloatArray(9)
             val gravityTemp = FloatArray(3)
             val orientationTemp = FloatArray(3)
@@ -232,12 +229,6 @@ class MotionPositionSensorData : SensorEventListener {
 
 
             if (isDataGatheringActive) {
-                if (firstGathering) {
-                    firstGathering = false
-                    firstTimestamp = System.nanoTime()
-                } else {
-                    lastTimestamp = System.nanoTime()
-                }
                 orientationTemp[0] = azimuth
                 orientationTemp[1] = orientationValues[1] - pitchOffset
                 orientationTemp[2] = orientationValues[2] - rollOffset
@@ -246,7 +237,7 @@ class MotionPositionSensorData : SensorEventListener {
                 xyzAxisTemp[1] = event.values[1] - gravityTemp[1] - yOffset
                 xyzAxisTemp[2] = event.values[2] - gravityTemp[2] - zOffset
             }
-            return DataValuesElement(isDataGatheringActive, gravityTemp, orientationTemp, xyzAxisTemp)
+            return DataValuesElement(isDataGatheringActive, gravityTemp, orientationTemp, xyzAxisTemp, timestamp)
         }
     }
 
@@ -254,7 +245,8 @@ class MotionPositionSensorData : SensorEventListener {
      * Ein Datenobjekt um mehrere Rückgabewerte für den Callable SensorMotionCalculator zu ermöglichen:
      */
     companion object class DataValuesElement(private val wasGatheringActive :  Boolean, private val gravity : FloatArray,
-                                  private val orientationData : FloatArray, private val xyzAxis : FloatArray) {
+                                             private val orientationData : FloatArray, private val xyzAxis :
+                                                 FloatArray, private val timestamp : Long) {
         fun getWasGatheringActive() : Boolean {
             return wasGatheringActive
         }
@@ -267,6 +259,9 @@ class MotionPositionSensorData : SensorEventListener {
         fun getXyzAxis() : FloatArray {
             return xyzAxis
         }
+        fun getTimestamp() : Long {
+            return timestamp
+        }
     }
 
     /*
@@ -277,52 +272,79 @@ class MotionPositionSensorData : SensorEventListener {
     *  Prec.:
      * Postc.: Gibt berechnete Daten als String zurück, wenn isDataGatheringActive ist true ansonsten null
     */
-    fun getData() : String? {
-        if(!isDataGatheringActive) {
-                // Über die Exemplarvariablen Listen kann nicht iterriert werden, weil in einem Thread
-                // über den Listener paralle auf diese zugegriffen wird. Deshalb werden die Listen kopiert
-                val xListFinish = xAxisList?.toMutableList()
-                val yListFinish = yAxisList?.toMutableList()
-                val zListFinish = zAxisList?.toMutableList()
-                val azimuthListFinish = azimuthList?.toMutableList()
-                val pitchListFinish = pitchList?.toMutableList()
-                val rollListFinish = rollList?.toMutableList()
-                // Berechne Mittelwert, Variant und Standardabweichung
-                val meanX = calculateMean(xListFinish)
-                val varianceX = calculateVariance(meanX, xListFinish)
-                val standardDevX = calculateStandardDeviation(varianceX)
-                val meanY = calculateMean(yListFinish)
-                val varianceY = calculateVariance(meanY, yListFinish)
-                val standardDevY = calculateStandardDeviation(varianceY)
-                val meanZ = calculateMean(zListFinish)
-                val varianceZ = calculateVariance(meanZ, zListFinish)
-                val standardDevZ = calculateStandardDeviation(varianceZ)
-                // Berechne Mittelwert für Gier-Nick-Roll
-                var radAzimuth = calculateAngelChangeAzimuth(azimuthListFinish)
-                radAzimuth *= (PI.toFloat() / 180)
-                val meanPitch = calculateMean(pitchListFinish)
-                val variancePitch = calculateVariance(meanPitch, pitchListFinish)
-                val standardPitch = calculateStandardDeviation(variancePitch)
-                val meanRoll = calculateMean(rollListFinish)
-                val varianceRoll = calculateVariance(meanRoll, rollListFinish)
-                val standardRoll = calculateStandardDeviation(varianceRoll)
-                // Representation der erfassten Daten als String. Kommas werden durch Punkte ersetzt.
-                return df.format(meanX).replace(',', '.') + "," + df.format(varianceX).replace(',', '.') + "," +
-                        df.format(standardDevX).replace(',', '.') + "," + df.format(meanY).replace(',', '.') + "," +
-                        df.format(varianceY).replace(',', '.') + "," + df.format(standardDevY).replace(',', '.') + "," +
-                        df.format(meanZ).replace(',', '.') + "," + df.format(varianceZ).replace(',', '.') + "," +
-                        df.format(standardDevZ).replace(',', '.') + "," + df.format(radAzimuth).replace(',', '.') + "," +
-                        df.format(meanPitch).replace(',', '.') + "," + df.format(variancePitch).replace(',', '.') + "," +
-                        df.format(standardPitch).replace(',', '.') + "," + df.format(meanRoll).replace(',', '.') + "," +
-                        df.format(varianceRoll).replace(',', '.') + "," + df.format(standardRoll).replace(',', '.')
+    fun getData( startExposureTime : Long, exposureTime : Long) : String? {
+        if(!isDataGatheringActive && exposureTime <= MAX_EXPOSURE_TIME) {
+            val indecis = getTimeframeIndecis(startExposureTime,exposureTime)
+            // Über die Exemplarvariablen Listen kann nicht iterriert werden, weil in einem Thread
+            // über den Listener paralle auf diese zugegriffen wird. Deshalb werden die Listen kopiert
+            val xListFinish = xAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
+            val yListFinish = yAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
+            val zListFinish = zAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
+            val azimuthListFinish = azimuthList?.toMutableList()?.subList(indecis[0], indecis[1])
+            val pitchListFinish = pitchList?.toMutableList()?.subList(indecis[0], indecis[1])
+            val rollListFinish = rollList?.toMutableList()?.subList(indecis[0], indecis[1])
+            // Berechne Mittelwert, Variant und Standardabweichung
+            val meanX = calculateMean(xListFinish)
+            val varianceX = calculateVariance(meanX, xListFinish)
+            val standardDevX = calculateStandardDeviation(varianceX)
+            val meanY = calculateMean(yListFinish)
+            val varianceY = calculateVariance(meanY, yListFinish)
+            val standardDevY = calculateStandardDeviation(varianceY)
+            val meanZ = calculateMean(zListFinish)
+            val varianceZ = calculateVariance(meanZ, zListFinish)
+            val standardDevZ = calculateStandardDeviation(varianceZ)
+            // Berechne Mittelwert für Gier-Nick-Roll
+            var radAzimuth = calculateAngelChangeAzimuth(azimuthListFinish)
+            radAzimuth *= (PI.toFloat() / 180)
+            val meanPitch = calculateMean(pitchListFinish)
+            val variancePitch = calculateVariance(meanPitch, pitchListFinish)
+            val standardPitch = calculateStandardDeviation(variancePitch)
+            val meanRoll = calculateMean(rollListFinish)
+            val varianceRoll = calculateVariance(meanRoll, rollListFinish)
+            val standardRoll = calculateStandardDeviation(varianceRoll)
+            // Representation der erfassten Daten als String. Kommas werden durch Punkte ersetzt.
+            return "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s".format(
+                    df.format(meanX).replace(',', '.'),df.format(varianceX).replace(',', '.'),
+                    df.format(standardDevX).replace(',', '.'),df.format(meanY).replace(',', '.'),
+                    df.format(varianceY).replace(',', '.'),df.format(standardDevY).replace(',', '.'),
+                    df.format(meanZ).replace(',', '.'),df.format(varianceZ).replace(',', '.'),
+                    df.format(standardDevZ).replace(',', '.'),df.format(radAzimuth).replace(',', '.'),
+                    df.format(meanPitch).replace(',', '.'),df.format(variancePitch).replace(',', '.'),
+                    df.format(standardPitch).replace(',', '.'),df.format(meanRoll).replace(',', '.'),
+                    df.format(varianceRoll).replace(',', '.'),df.format(standardRoll).replace(',', '.'),"${xListFinish?.size}")
         }
         return null
     }
 
-
-    fun getIsDataGatheringActive() : Boolean {
-        return isDataGatheringActive
+    /**
+     * Diese Funktion berechnet den Startindex und den Stoppindex eines Zeitfensterns.
+     * Die länge des Zeitfensters ist abhängig von der Belichtungszeit.
+     * Prec.: exposureTime <= MAX_EXPOSURE_TIME
+     * Postc.: Array mit den zwei Indexen
+     */
+    private fun getTimeframeIndecis( startExposureTime : Long, exposureTime : Long) : IntArray {
+        val indecis = IntArray(2)
+        val exposureDiff = MAX_EXPOSURE_TIME - exposureTime
+        val offsetExposure = exposureDiff / 2
+        val timestampFinish = timestampsList?.toMutableList()
+        val startExposureTimeOffset = startExposureTime - offsetExposure
+        val stopExposureTimeOffset = startExposureTime + exposureTime + offsetExposure
+        var i = 0
+        var startFound = false
+        timestampFinish?.forEach {
+            if (!startFound && it >= startExposureTimeOffset) {
+                indecis[0] = i
+                startFound = true
+            } else if (startFound && it <= stopExposureTimeOffset) {
+                indecis[1] = i
+            } else {
+                return@forEach
+            }
+            i++
+        }
+        return indecis
     }
+
 
     /**
      * Diese Methode startet die Ansammlung von Daten des linearen Beschleunigungssensors
@@ -331,7 +353,6 @@ class MotionPositionSensorData : SensorEventListener {
      */
     fun startDataCollection() {
         if(!isDataGatheringActive)
-            firstGathering = true
             isDataGatheringActive = true
     }
 
@@ -347,36 +368,23 @@ class MotionPositionSensorData : SensorEventListener {
     }
 
     /**
-     * Gibt den Zeitstempel des ersten Sensorevents seit Beginn von startDataCollection.
-     * Prec.:
-     * Postc.: Long Wert zurückgegeben des ersten Zeitstempel in Nanosekunden
-     */
-    fun getFirstTimestamp() : Long{
-        return firstTimestamp
-    }
-
-    /**
-     * Gibt den letzten Zeitstempel der Sensorevents zurück nachdem stopDataCollection aufgerufen wurde
-     * Prec.:
-     * Postc.: Long Wert des letzten Sensorevent Zeitstempel
-     */
-    fun getLastTimestamp() : Long {
-        return lastTimestamp
-    }
-
-    /**
      * Die Funktion entfernt alle Elemente aus den Datenlisten:
      * xAxisList, yAxisList, zAxisList, azimuthList, pitchList, rollList
      * Prec.:
      * Postc.: Die angegebenen Listen haben keine Elemente mehr
      */
     fun clearData() {
+        timestampsList?.clear()
         xAxisList?.clear()
         yAxisList?.clear()
         zAxisList?.clear()
         azimuthList?.clear()
         pitchList?.clear()
         rollList?.clear()
+    }
+
+    fun getFirstTimestamp() : Long? {
+        return timestampsList?.first()
     }
 
     /**
@@ -411,7 +419,7 @@ class MotionPositionSensorData : SensorEventListener {
      * Prec.:
      * Postc.: Winkdeländerung berechnet
      */
-     fun calculateAngelChangeAzimuth(list : MutableList<Float>?) : Float {
+    fun calculateAngelChangeAzimuth(list : MutableList<Float>?) : Float {
         var result = 0.0f
         if(list?.isNotEmpty()!!) {
             val firstAzimuth = list.first()
@@ -421,7 +429,7 @@ class MotionPositionSensorData : SensorEventListener {
                 result = 360 - result
         }
         return result
-     }
+    }
 
     /**
      * Berechnet die Varianz. Dieser Funktion muss als Paramter der Mittelwert (mean) und die Liste mit
