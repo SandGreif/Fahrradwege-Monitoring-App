@@ -349,8 +349,17 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     if (imageCounter % (2000 * directoriesCounter) == 0) {
                         newFolder()
                     }
-                    saveFeatures(timeMs)
+                    val thread = Thread {
+                        saveFeatures(timeMs)
+                    }
+                    thread.start()
                     saveImage(image, timeMs)
+                    try {
+                        thread.join()
+                    } catch (e: Exception) {
+                        Logger.writeToLogger(Exception().stackTrace[0],e.toString())
+                        throw e
+                    }
                     activity.runOnUiThread({
                         run {
                             imageCounterTxt.text = "%d %s".format(imageCounter, "Bilder")
@@ -446,12 +455,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
         }
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
-        fileLocation = File(actualDirectory, ("features.csv"))
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
-                "Zeitstempel","Breitengrad","Laengengrad","Geschwindigkeit","MittelX","VarianzX","StandardabweichungX","MittelY",
-                "VarianzY","StandardabweichungY","MittelZ","VarianzZ","StandardabweichungZ","Azimuth","MittelPitch","VarianzPitch",
-                "StandardabweichungPitch","MittelRoll","VarianzRoll","StandardabweichungRoll","Messwerte",
-                "StartBewegungsD","StartBelichtung","Belichtungszeit"))
+        fileLocation = File(actualDirectory, ("featuresRoh.csv"))
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+                "Zeitstempel","Breitengrad","Laengengrad","Geschwindigkeit","AccelerometerX","AccelerometerY","AccelerometerZ",
+                "Azimuth","Nick","Roll","Messwerte","StartBewegungsD","StartBelichtung","Belichtungszeit"))
     }
 
     override fun onCreateView(inflater: LayoutInflater,
@@ -664,6 +671,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         Logger.writeToLogger(Exception().stackTrace[0],"")
         closeCamera()
         gpsLocation?.onStop()
+        motionPositionSensorData?.onStop()
     }
 
     private fun closeCamera() {

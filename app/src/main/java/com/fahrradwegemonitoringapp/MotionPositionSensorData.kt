@@ -78,7 +78,7 @@ class MotionPositionSensorData : SensorEventListener  {
     /**
      * Um Datenwerte aufzurunden auf 5 Kommastellen
      */
-    private var df = DecimalFormat("#.###")
+    private var df = DecimalFormat("#.#####")
 
     /**
      * Wird benötigt um die Richtung des geomagnetischen Nordpols zu bestimmen
@@ -204,38 +204,33 @@ class MotionPositionSensorData : SensorEventListener  {
             val azimuthListFinish = azimuthList?.toMutableList()?.subList(indecis[0], indecis[1])
             val pitchListFinish = pitchList?.toMutableList()?.subList(indecis[0], indecis[1])
             val rollListFinish = rollList?.toMutableList()?.subList(indecis[0], indecis[1])
-            // Berechne Mittelwert, Variant und Standardabweichung
-            val meanX = calculateMean(xListFinish)
-            val varianceX = calculateVariance(meanX, xListFinish)
-            val standardDevX = calculateStandardDeviation(varianceX)
-            val meanY = calculateMean(yListFinish)
-            val varianceY = calculateVariance(meanY, yListFinish)
-            val standardDevY = calculateStandardDeviation(varianceY)
-            val meanZ = calculateMean(zListFinish)
-            val varianceZ = calculateVariance(meanZ, zListFinish)
-            val standardDevZ = calculateStandardDeviation(varianceZ)
-            // Berechne Mittelwert für Gier-Nick-Roll
-            var radAzimuth = calculateAngelChangeAzimuth(azimuthListFinish)
-            radAzimuth *= (PI.toFloat() / 180)
-            val meanPitch = calculateMean(pitchListFinish)
-            val variancePitch = calculateVariance(meanPitch, pitchListFinish)
-            val standardPitch = calculateStandardDeviation(variancePitch)
-            val meanRoll = calculateMean(rollListFinish)
-            val varianceRoll = calculateVariance(meanRoll, rollListFinish)
-            val standardRoll = calculateStandardDeviation(varianceRoll)
-            // Representation der erfassten Daten als String. Kommas werden durch Punkte ersetzt.
-            return "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s".format(
-                    df.format(meanX).replace(',', '.'),df.format(varianceX).replace(',', '.'),
-                    df.format(standardDevX).replace(',', '.'),df.format(meanY).replace(',', '.'),
-                    df.format(varianceY).replace(',', '.'),df.format(standardDevY).replace(',', '.'),
-                    df.format(meanZ).replace(',', '.'),df.format(varianceZ).replace(',', '.'),
-                    df.format(standardDevZ).replace(',', '.'),df.format(radAzimuth).replace(',', '.'),
-                    df.format(meanPitch).replace(',', '.'),df.format(variancePitch).replace(',', '.'),
-                    df.format(standardPitch).replace(',', '.'),df.format(meanRoll).replace(',', '.'),
-                    df.format(varianceRoll).replace(',', '.'),df.format(standardRoll).replace(',', '.'),"${xListFinish?.size}")
+            return "%s,%s,%s,%s,%s,%s,%s".format(
+                    calcStringList(xListFinish),
+                    calcStringList(yListFinish),
+                    calcStringList(zListFinish),
+                    calcStringList(azimuthListFinish),
+                    calcStringList(pitchListFinish),
+                    calcStringList(rollListFinish),
+                    "${xListFinish?.size}")
         }
         return null
     }
+
+    /**
+     * Diese Funktion gibt einen String einer Float Liste zurück.
+     * Dabei soll dient dies als Vorverarbeitung, um diesen in eine CSV Datei
+     * zu schreiben
+     * Prec. Anzahl der Elmenete in Liste > 0
+     * Postc. String wird zurück gegeben
+     */
+    private fun calcStringList(list : MutableList<Float>?) : String {
+        var result = ""
+        list?.forEach {
+            result += df.format(it).replace(",", ".") + " "
+        }
+        return result
+    }
+
 
     /**
      * Diese Funktion berechnet den Startindex und den Stoppindex eines Zeitfensterns.
@@ -264,6 +259,13 @@ class MotionPositionSensorData : SensorEventListener  {
             i++
         }
         return indecis
+    }
+
+    /**
+     * Meldet die Listener ab. Sollte aufgerufen wenn die App geschlossen wird.
+     */
+    fun onStop() {
+        mSensorManager!!.unregisterListener(this)
     }
 
     /**
