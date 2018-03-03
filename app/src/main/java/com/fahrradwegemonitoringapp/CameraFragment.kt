@@ -663,7 +663,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
         super.onStop()
         Logger.writeToLogger(Exception().stackTrace[0],"")
         closeCamera()
-        motionPositionSensorData?.onStop()
         gpsLocation?.onStop()
     }
 

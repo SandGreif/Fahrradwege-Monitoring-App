@@ -20,12 +20,7 @@ import kotlin.math.sqrt
  * Von Julian Magierski am 13.02.2018 erstellt.
  */
 
-class MotionPositionSensorData : SensorEventListener {
-
-    private var mSensorManager: SensorManager? = null
-    private var mAccelerometer: Sensor? = null
-    private var mMagneticField: Sensor? = null
-    private var activity: Activity? = null
+class MotionPositionSensorData : SensorEventListener  {
 
     /**
      * Listen zum zwischenspeichern der Beschleunigungssensordaten x,y,z
@@ -34,10 +29,10 @@ class MotionPositionSensorData : SensorEventListener {
     private var yAxisList: MutableList<Float>? = null
     private var zAxisList: MutableList<Float>? = null
 
+
     private var azimuthList: MutableList<Float>? = null
     private var pitchList: MutableList<Float>? = null
     private var rollList: MutableList<Float>? = null
-
 
     /**
      * Zeitstempel innerhalb eines Zeitfensters,
@@ -48,11 +43,11 @@ class MotionPositionSensorData : SensorEventListener {
      *  In diesen Variablen stehen die Kallibrierungsoffsets für
      *  Roll und Nick Winkel sowie die Beschleunigungssensorachsen X,Y,Z
      */
-    private var pitchOffset : Float = 0.0f
-    private var rollOffset : Float = 0.0f
-    private var xOffset : Float = 0.0f
-    private var yOffset : Float = 0.0f
-    private var zOffset : Float = 0.0f
+    private var pitchOffset: Float = 0.0f
+    private var rollOffset: Float = 0.0f
+    private var xOffset: Float = 0.0f
+    private var yOffset: Float = 0.0f
+    private var zOffset: Float = 0.0f
 
     // Current data from accelerometer & magnetometer.  The arrays hold values
     // for X, Y, and Z.
@@ -63,32 +58,39 @@ class MotionPositionSensorData : SensorEventListener {
      * Alpha Wert fuer Tiefpassfilter um Gravity Wete aus den Beschleunigungssensordaten
      * zu entfernen
      */
-    private val alpha : Float = 0.8f
+    private  val alpha: Float = 0.8f
     private var gravity = FloatArray(3)
-
-    /**
-     * Um Datenwerte aufzurunden auf 5 Kommastellen
-     */
-    private var  df = DecimalFormat("#.###")
 
     /**
      * Boolean Variable die angibt ob Daten Samples gesammelt werden sollen.
      * Durch Volatile wird angegeben das eine Änderung dieser Variablen schnellst möglich
      * von anderen Threads gelesesn werden kann.
      */
-    @Volatile private var isDataGatheringActive : Boolean = false
+    @Volatile
+    private var isDataGatheringActive: Boolean = false
+
+
+    private var mSensorManager: SensorManager? = null
+    private var mAccelerometer: Sensor? = null
+    private var mMagneticField: Sensor? = null
+    private var activity: Activity? = null
 
     /**
-     * Wird benötigt um die Richtung des  geomagnetischen Nordpols zu bestimmen
+     * Um Datenwerte aufzurunden auf 5 Kommastellen
      */
-    private lateinit var location : GPSLocation
+    private var df = DecimalFormat("#.###")
+
+    /**
+     * Wird benötigt um die Richtung des geomagnetischen Nordpols zu bestimmen
+     */
+    private lateinit var location: GPSLocation
 
     /**
      * Diese Methode muss aufgerufen werden, um die Sensor Listener zu starten
      * Prec.: activity != null
      * Postc.: Listener wurden initialisiert
      */
-    fun init(activity: Activity, location : GPSLocation) {
+    fun init(activity: Activity, location: GPSLocation) {
         // Datenwerte sollen aufgerunded werden auf 5 Kommastellen
         df.roundingMode = RoundingMode.CEILING
         this.activity = activity
@@ -109,16 +111,16 @@ class MotionPositionSensorData : SensorEventListener {
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
         if (sensor != null) {
-            if(sensor.type  == Sensor.TYPE_MAGNETIC_FIELD) {
-                when(accuracy) {
+            if (sensor.type == Sensor.TYPE_MAGNETIC_FIELD) {
+                when (accuracy) {
                 // Genauigkeit ist Unzuverlaessig
                     0 -> {
                         Toast.makeText(activity, "Magnetsensor Genauigkeit: unzuverlässig", Toast.LENGTH_SHORT).show()
-                        Logger.writeToLogger(Exception().stackTrace[0],"Magnetsensor Genauigkeit: SENSOR_STATUS_UNRELIABLE\n")
+                        Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensor Genauigkeit: SENSOR_STATUS_UNRELIABLE\n")
                     }
                     1 -> {
                         Toast.makeText(activity, "Magnetsensor Genauigkeit: niedrig", Toast.LENGTH_SHORT).show()
-                        Logger.writeToLogger(Exception().stackTrace[0],"Magnetsensor Genauigkeit: SENSOR_STATUS_ACCURACY_LOW\n")
+                        Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensor Genauigkeit: SENSOR_STATUS_ACCURACY_LOW\n")
                     }
                     2 -> {
                         Toast.makeText(activity, "Magnetsensor Genauigkeit: mittel", Toast.LENGTH_SHORT).show()
@@ -133,63 +135,55 @@ class MotionPositionSensorData : SensorEventListener {
         }
     }
 
-    /**
-     * Meldet die Listener ab. Sollte aufgerufen wenn die App geschlossen wird.
-     */
-    fun onStop() {
-        mSensorManager!!.unregisterListener(this)
-    }
-
     override fun onSensorChanged(event: SensorEvent?) {
         val timestamp = System.nanoTime()
-            if (event != null) {
-                val sensorType = event.sensor.type
-                when (sensorType) {
-                    Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
-                    Sensor.TYPE_MAGNETIC_FIELD -> mMagnetometerData = event.values.clone()
-                }
-                if (sensorType == Sensor.TYPE_ACCELEROMETER) {
-                    // Berechnet die Rotationsmatrix. Dabei werden die Beschleunigungssensordaten und
-                    // Magnetsensordaten genutzt, um die Smartphone spezifischen Koordinaten auf die Welt Koordinaten
-                    // zu transformieren
-                    val rotationMatrix = FloatArray(9)
-                    val rotationOK = SensorManager.getRotationMatrix(rotationMatrix,
-                            null, mAccelerometerData, mMagnetometerData)
-                    // Gibt die Orientierung des Smartphones in der Gier-Nick-Roll Form zurück
-                    val orientationValues = FloatArray(3)
-                    if (rotationOK) {
-                        SensorManager.getOrientation(rotationMatrix, orientationValues)
-                    }
-                    // Anwendung eines einfachen Tiefpassfilters, um den Gravitationsanteil
-                    // aus den Beschleunigungssensordaten zu entfernen
-                    gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0]
-                    gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
-                    gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
-                    if (isDataGatheringActive) {
-                        var azimuth: Float = orientationValues[0]
-                        val geoField: GeomagneticField
-                        azimuth *= (180 / PI.toFloat())
-                        if (location.getLocation() != null) {
-                            // Wird benötigt um den magnetischen Norden in welche die Variable azimuth
-                            // zeigt in den geografischen Norden zu konvertieren
-                            geoField = GeomagneticField(location.getLocation()!!.latitude.toFloat(),
-                                    location.getLocation()!!.longitude.toFloat(),
-                                    location.getLocation()!!.altitude.toFloat(),
-                                    System.currentTimeMillis())
-                            azimuth += geoField.declination // Berechnet den magnetischen Norden zu den geografischen Norden
-                        }
-                        timestampsList?.add(System.nanoTime())
-                        azimuthList?.add(azimuth)
-                        pitchList?.add(orientationValues[1] - pitchOffset)
-                        rollList?.add(orientationValues[2] - rollOffset)
-                        xAxisList?.add(event.values[0] - gravity[0] - xOffset)
-                        yAxisList?.add(event.values[1] - gravity[1] - yOffset)
-                        zAxisList?.add(event.values[2] - gravity[2] - zOffset)
-                        timestampsList?.add(timestamp)
-                    }
-                }
+        val sensorType = event?.sensor?.type
+        when (sensorType) {
+            Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
+            Sensor.TYPE_MAGNETIC_FIELD -> mMagnetometerData = event.values.clone()
+        }
+        if (sensorType == Sensor.TYPE_ACCELEROMETER) {
+            // Berechnet die Rotationsmatrix. Dabei werden die Beschleunigungssensordaten und
+            // Magnetsensordaten genutzt, um die Smartphone spezifischen Koordinaten auf die Welt Koordinaten
+            // zu transformieren
+            val rotationMatrix = FloatArray(9)
+            val rotationOK = SensorManager.getRotationMatrix(rotationMatrix,
+                    null, mAccelerometerData, mMagnetometerData)
+            // Gibt die Orientierung des Smartphones in der Gier-Nick-Roll Form zurück
+            val orientationValues = FloatArray(3)
+            if (rotationOK) {
+                SensorManager.getOrientation(rotationMatrix, orientationValues)
             }
+            // Anwendung eines einfachen Tiefpassfilters, um den Gravitationsanteil
+            // aus den Beschleunigungssensordaten zu entfernen
+            gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0]
+            gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
+            gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
+            if (isDataGatheringActive) {
+                var azimuth: Float = orientationValues[0]
+                val geoField: GeomagneticField
+                azimuth *= (180 / PI.toFloat())
+                if (location.getLocation() != null) {
+                    // Wird benötigt um den magnetischen Norden in welche die Variable azimuth
+                    // zeigt in den geografischen Norden zu konvertieren
+                    geoField = GeomagneticField(location.getLocation()!!.latitude.toFloat(),
+                            location.getLocation()!!.longitude.toFloat(),
+                            location.getLocation()!!.altitude.toFloat(),
+                            System.currentTimeMillis())
+                    azimuth += geoField.declination // Berechnet den magnetischen Norden zu den geografischen Norden
+                }
+                timestampsList?.add(System.nanoTime())
+                azimuthList?.add(azimuth)
+                pitchList?.add(orientationValues[1] - pitchOffset)
+                rollList?.add(orientationValues[2] - rollOffset)
+                xAxisList?.add(event.values[0] - gravity[0] - xOffset)
+                yAxisList?.add(event.values[1] - gravity[1] - yOffset)
+                zAxisList?.add(event.values[2] - gravity[2] - zOffset)
+                timestampsList?.add(timestamp)
+            }
+        }
     }
+
 
     /*
     * Von den erfasten Daten wird der Mittelwert die Varianz und die Standardabweichung berechnet.
@@ -272,7 +266,6 @@ class MotionPositionSensorData : SensorEventListener {
         return indecis
     }
 
-
     /**
      * Diese Methode startet die Ansammlung von Daten des linearen Beschleunigungssensors
      * Prec.:
@@ -311,7 +304,10 @@ class MotionPositionSensorData : SensorEventListener {
     }
 
     fun getFirstTimestamp() : Long? {
-        return timestampsList?.first()
+        var result : Long? = -1
+        if(timestampsList?.isNotEmpty()!!)
+            result = timestampsList?.first()
+        return result
     }
 
     /**
