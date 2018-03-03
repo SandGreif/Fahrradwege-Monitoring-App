@@ -390,10 +390,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun stopDataCapturing() : Boolean {
         var exposerTimeGreaterZero = false
         // Die verstrichene Zeit muss mindestens der MAX_EXPOSURE_TIME entsprechen
-        if(System.nanoTime() - exposureTimeStart + exposureTime < MAX_EXPOSURE_TIME) {
+        if((System.nanoTime() - exposureTimeStart + exposureTime) < MAX_EXPOSURE_TIME) {
             // Ausreichend Zeit für die Bewegungssensordatenerfassung gewährleisten
             try {
-                Thread.sleep(MAX_EXPOSURE_TIME -(System.nanoTime() - exposureTimeStart + exposureTime))
+                Thread.sleep(MAX_EXPOSURE_TIME -((System.nanoTime() - exposureTimeStart) + exposureTime))
             } catch (e: IllegalArgumentException) {
                 Logger.writeToLogger(Exception().stackTrace[0],e.toString())
             }
@@ -456,9 +456,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("featuresRoh.csv"))
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "Zeitstempel","Breitengrad","Laengengrad","Geschwindigkeit","AccelerometerX","AccelerometerY","AccelerometerZ",
-                "Azimuth","Nick","Roll","Messwerte","StartBewegungsD","StartBelichtung","Belichtungszeit"))
+                "Azimuth","Nick","Roll","SensorZeitstempel","Messwerte","StartBewegungsD","StartBelichtung","Belichtungszeit"))
     }
 
     override fun onCreateView(inflater: LayoutInflater,
@@ -868,6 +868,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 abortCaptures()
             }
             motionPositionSensorData?.startDataCollection()
+            // Warte ab damit ausreichend Sensordaten erfasst werden können
+            try {
+                Thread.sleep(20)
+            } catch (e: IllegalArgumentException) {
+                Logger.writeToLogger(Exception().stackTrace[0],e.toString())
+            }
             captureSession?.capture(captureBuilder?.build(), captureCallback, null)
 
         } catch (e: CameraAccessException) {
