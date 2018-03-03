@@ -237,7 +237,7 @@ class MotionPositionSensorData : SensorEventListener  {
         list?.forEach {
             result += df.format(it).replace(",", ".") + " "
         }
-        return result
+        return result.dropLast(1)
     }
 
     /**

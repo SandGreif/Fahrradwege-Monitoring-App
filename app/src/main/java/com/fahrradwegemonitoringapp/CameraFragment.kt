@@ -415,11 +415,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Speichert Features ab: Zeit in ms/ GPS Längengrad / Breitengrad / Geschwindigkeit /
+     * Speichert Merkmale ab: Zeit in ms/ GPS Längengrad / Breitengrad / Geschwindigkeit /
      * Beschleunigungssensordaten (X,Y,Z) mit den jeweiligen Mittelwert, Varianz und Standardabweichung /
      * Gier / Nick Mittelwert / Roll Mittelwert /
      * Prec.:  timestamp > 0
-     * Postc.: Features wurden in eine Datei geschrieben
+     * Postc.: Merkmale wurden in eine Datei geschrieben
      */
     private fun saveFeatures(timestamp : Long) {
         val latitude = location?.latitude?.toFloat()
@@ -445,9 +445,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
-     * Mit dieser Methode kann ein neuer Ordner erstellt werden für Feature Daten.
+     * Mit dieser Methode kann ein neuer Ordner erstellt werden, um Merkmale in eine Daten
+     * zu schreiben.
      * Prec.:
-     * Postc.: Ein neuer Ordner für die Features wurde erstellt
+     * Postc.: Ein neuer Ordner für die Merkmale wurde erstellt
      */
     private fun newFolder() {
         if(imageCounter>1) {
@@ -455,7 +456,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         }
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
-        fileLocation = File(actualDirectory, ("featuresRoh.csv"))
+        fileLocation = File(actualDirectory, ("merkmaleRoh.csv"))
         fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "Zeitstempel","Breitengrad","Laengengrad","Geschwindigkeit","AccelerometerX","AccelerometerY","AccelerometerZ",
                 "Azimuth","Nick","Roll","SensorZeitstempel","Messwerte","StartBewegungsD","StartBelichtung","Belichtungszeit"))
@@ -869,11 +870,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
             }
             motionPositionSensorData?.startDataCollection()
             // Warte ab damit ausreichend Sensordaten erfasst werden können
-            try {
-                Thread.sleep(20)
-            } catch (e: IllegalArgumentException) {
-                Logger.writeToLogger(Exception().stackTrace[0],e.toString())
-            }
+           // try { TODO Wert muss noch gemessen werden
+           //     Thread.sleep(20)
+           // } catch (e: IllegalArgumentException) {
+           //     Logger.writeToLogger(Exception().stackTrace[0],e.toString())
+           // }
             captureSession?.capture(captureBuilder?.build(), captureCallback, null)
 
         } catch (e: CameraAccessException) {
