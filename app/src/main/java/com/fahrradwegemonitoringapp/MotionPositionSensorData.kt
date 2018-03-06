@@ -179,7 +179,7 @@ class MotionPositionSensorData : SensorEventListener  {
                             System.currentTimeMillis())
                     azimuth += geoField.declination // Berechnet den magnetischen Norden zu den geografischen Norden
                 }
-                azimuthList?.add(azimuth / (180 * PI.toFloat()))
+                azimuthList?.add(azimuth * (PI.toFloat() / 180))
                 pitchList?.add(orientationValues[1] - pitchOffset)
                 rollList?.add(orientationValues[2] - rollOffset)
                 xAxisList?.add(event.values[0] - gravity[0] - xOffset)
