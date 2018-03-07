@@ -363,69 +363,6 @@ class MotionPositionSensorData : SensorEventListener  {
     }
 
     /**
-     * Die Funktion berechnet die Winkeländerung zwischen den ersten Gier und den letzten Gierwinkel
-     * innerhalb einer als Paramter übergebenen Liste. Der zurückgegebene Winkel ist immer positiv und
-     * zeigt die relative änderung des Winkels.
-     * Prec.:
-     * Postc.: Winkdeländerung berechnet
-     */
-    fun calculateAngelChangeAzimuth(list : MutableList<Float>?) : Float {
-        var result = 0.0f
-        if(list?.isNotEmpty()!!) {
-            val firstAzimuth = list.first()
-            val lastAzimuth = list.last()
-            result = abs( firstAzimuth - lastAzimuth)
-            if(result > 180)
-                result = 360 - result
-        }
-        return result
-    }
-
-    /**
-     * Berechnet die Varianz. Dieser Funktion muss als Paramter der Mittelwert (mean) und die Liste mit
-     * den Float Werten übergeben werden, um die Varianz zu berechnen. Als Varianz wird der Durchschnitt der quadrierten
-     * Differenzen zum Mittelwert bezeichnet.
-     * Prec.:
-     * Postc.: Gibt die berechnete Variance als Float zurück oder 0 wenn die Anzahl der Werte <= 0
-     */
-    fun calculateVariance(mean : Float, list : MutableList<Float>?) : Float {
-        var sum = 0f
-        val samples = list?.size
-        var tempDifference : Float
-        val result : Float
-        if (samples != null) {
-            if (samples > 0) {
-                list.forEach {
-                    tempDifference = it-mean
-                    sum += tempDifference * tempDifference
-                }
-                result = sum / samples
-            } else {
-                result = 0f
-            }} else {
-            result = 0f
-        }
-        return result
-    }
-
-    /**
-     * Hier wird die Standardabweichung der Varianz berechnet. Dies ist die Wurzel von der Varianz.
-     * Prec.:
-     * Postc.:  Standardabweichung wird zurückgegeben. Für die Berechnung wird der Absolutwert von der Varianz genommen.
-     */
-    fun calculateStandardDeviation(variance : Float) : Float{
-        val x = abs(variance)
-        var result : Float
-        var wasNegative = false
-        if(variance < 0.0)
-            wasNegative = true
-        result = sqrt(x)
-        if(wasNegative)
-            result *= -1
-        return result
-    }
-
-    /**
      * Die Methode startet die Kalibration der Roll-Nick Winkel.
      * Ziel ist es das montierte Smartphone so zu Kalibrieren das diese Winkel in Ruhezustand 0 ergeben.
      * Hier wird dafür die Datenerfassung gestartet.
