@@ -18,6 +18,11 @@
 
 package com.fahrradwegemonitoringapp
 
+/**
+ *  Dies ist die Anfrage ID, welche zurückgegeben wird
+ *  wenn der Nutzer die Erlaubnis gegeben oder nicht gegeben hat für
+ *  den Zugriff auf die Kamera, Schreibrechte und GPS des Smartphones.
+ */
 const val REQUEST_MULTIPLE_PERMISSIONS = 1
 
 /**

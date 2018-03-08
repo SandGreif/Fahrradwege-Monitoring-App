@@ -177,7 +177,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     /**
      * Um Datenwerte aufzurunden auf 2 Kommastellen
      */
-    private var  df = DecimalFormat("#.##")
+    private var  df = DecimalFormat("#.#####")
 
     /**
      * Wurzelverzeichnis um Dateien abzuspeichern
@@ -345,7 +345,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
             if (location != null) {
                 if(stopDataCapturing()) {
                     speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
-                    //  if (((speed - 4.0f) > 0.0001)) {  // bei vorhandener Geschwindigkeit
+                    if ((((speed - 5.0f) > 0.0001)) && ((speed - 25.0f) < 0.0001)) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
                     if (imageCounter % (2000 * directoriesCounter) == 0) {
                         newFolder()
                     }
@@ -366,9 +366,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
                             speedTxt.text = "%s %s".format(df.format(speed), " km/h")
                         }
                     })
-                    //  } else {
-                    //    image.close()
-                    //  }
+                    } else {
+                        image.close()
+                    }
                 } else {
                     Logger.writeToLogger(Exception().stackTrace[0],"Belichtungszeit war 0")
                     image.close()
@@ -869,12 +869,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 abortCaptures()
             }
             motionPositionSensorData?.startDataCollection()
-            // Warte ab damit ausreichend Sensordaten erfasst werden können
-           // try { TODO Wert muss noch gemessen werden
-           //     Thread.sleep(20)
-           // } catch (e: IllegalArgumentException) {
-           //     Logger.writeToLogger(Exception().stackTrace[0],e.toString())
-           // }
             captureSession?.capture(captureBuilder?.build(), captureCallback, null)
 
         } catch (e: CameraAccessException) {

@@ -7,8 +7,6 @@ import android.widget.Toast
 import java.math.RoundingMode
 import java.text.DecimalFormat
 import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.sqrt
 
 
 /**
