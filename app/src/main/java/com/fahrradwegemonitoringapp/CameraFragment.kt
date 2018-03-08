@@ -390,10 +390,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun stopDataCapturing() : Boolean {
         var exposerTimeGreaterZero = false
         // Die verstrichene Zeit muss mindestens der MAX_EXPOSURE_TIME entsprechen
-        if((System.nanoTime() - exposureTimeStart + exposureTime) < MAX_EXPOSURE_TIME) {
+        if((System.nanoTime() - exposureTimeStart + exposureTime) < MAX_TIMEFRAME) {
             // Ausreichend Zeit für die Bewegungssensordatenerfassung gewährleisten
             try {
-                Thread.sleep(MAX_EXPOSURE_TIME -((System.nanoTime() - exposureTimeStart) + exposureTime))
+                Thread.sleep(MAX_TIMEFRAME -((System.nanoTime() - exposureTimeStart) + exposureTime))
             } catch (e: IllegalArgumentException) {
                 Logger.writeToLogger(Exception().stackTrace[0],e.toString())
             }

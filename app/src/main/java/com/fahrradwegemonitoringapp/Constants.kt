@@ -28,4 +28,5 @@ const val REQUEST_MULTIPLE_PERMISSIONS = 1
 /**
  * Grenzwert max Belichtungszeit in Nanosekunden
  */
-const val  MAX_EXPOSURE_TIME= 40000000
+const val  MAX_TIMEFRAME = 80000000
+

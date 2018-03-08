@@ -199,7 +199,7 @@ class MotionPositionSensorData : SensorEventListener  {
      * Postc.: Gibt berechnete Daten als String zurück, wenn isDataGatheringActive ist true ansonsten null
     */
     fun getData( startExposureTime : Long, exposureTime : Long) : String? {
-        if(!isDataGatheringActive && exposureTime <= MAX_EXPOSURE_TIME) {
+        if(!isDataGatheringActive && exposureTime <= MAX_TIMEFRAME) {
             val indecis = getTimeframeIndecis(startExposureTime,exposureTime)
             // Über die Exemplarvariablen Listen kann nicht iterriert werden, weil in einem Thread
             // über den Listener paralle auf diese zugegriffen wird. Deshalb werden die Listen kopiert
@@ -261,7 +261,7 @@ class MotionPositionSensorData : SensorEventListener  {
      */
     private fun getTimeframeIndecis( startExposureTime : Long, exposureTime : Long) : IntArray {
         val indecis = IntArray(2)
-        val exposureDiff = MAX_EXPOSURE_TIME - exposureTime
+        val exposureDiff = MAX_TIMEFRAME - exposureTime
         val offsetExposure = exposureDiff / 2 // Berechnet Offset-Zeit
         val timestampFinish = timestampsList?.toMutableList()
         val startExposureTimeOffset = startExposureTime - offsetExposure
@@ -273,7 +273,7 @@ class MotionPositionSensorData : SensorEventListener  {
                 startFound = true
             } else if (startFound &&
                     // Diese Abfrage ist wichtig weil die beiden Zeitstempel eine andere Zeitbasis nutzen
-                    (timestampsSensorList?.get(i)!! - timestampsSensorList?.get(indecis[0])!!) <= MAX_EXPOSURE_TIME ) {
+                    (timestampsSensorList?.get(i)!! - timestampsSensorList?.get(indecis[0])!!) <= MAX_TIMEFRAME ) {
                 indecis[1] = i
             } else if(startFound){
                 return@forEach
