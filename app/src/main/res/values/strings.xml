@@ -4,6 +4,7 @@
     <string name="camera_error">This device doesn\'t support Camera2 API.</string>
     <string name="imageCounterTxt"> </string>
     <string name="speedTxt"> </string>
+    <string name="magnetTxt"> </string>
     <string name="buttonStartTxt">Starte Datenerfassung</string>
     <string name="buttonStopTxt">Stoppe Datenerfassung</string>
     <string name="buttonStartCalibration">Starte Kalibrierung</string>

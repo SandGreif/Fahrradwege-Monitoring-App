@@ -52,6 +52,18 @@
         android:textSize="24sp" />
 
     <TextView
+        android:id="@+id/magnetTxt"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/imageCounterTxt"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="40dp"
+        android:fontFamily="sans-serif-condensed"
+        android:text="@string/magnetTxt"
+        android:textColor="@android:color/holo_red_dark"
+        android:textSize="24sp" />
+
+    <TextView
         android:id="@+id/imageCounterTxt"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

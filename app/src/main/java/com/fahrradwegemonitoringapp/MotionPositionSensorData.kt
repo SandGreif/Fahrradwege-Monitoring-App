@@ -3,6 +3,7 @@ package com.fahrradwegemonitoringapp
 import android.app.Activity
 import android.content.Context
 import android.hardware.*
+import android.widget.TextView
 import android.widget.Toast
 import java.math.RoundingMode
 import java.text.DecimalFormat
@@ -19,6 +20,12 @@ import kotlin.math.PI
  */
 
 class MotionPositionSensorData : SensorEventListener  {
+
+    /**
+     * Gibt für den Benutzer eine Warnung aus, wenn
+     * die Magnetsensorgenauigkeit ungenau ist
+     */
+    private lateinit var magnetTxt : TextView
 
     /**
      * Listen zum zwischenspeichern der Beschleunigungssensordaten x,y,z
@@ -112,6 +119,7 @@ class MotionPositionSensorData : SensorEventListener  {
         rollList = mutableListOf()
         timestampsList = mutableListOf()
         timestampsSensorList = mutableListOf()
+        magnetTxt = activity.findViewById(R.id.magnetTxt) as TextView
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
@@ -120,20 +128,32 @@ class MotionPositionSensorData : SensorEventListener  {
                 when (accuracy) {
                 // Genauigkeit ist Unzuverlaessig
                     0 -> {
-                        Toast.makeText(activity, "Magnetsensor Genauigkeit: unzuverlässig", Toast.LENGTH_SHORT).show()
-                        Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensor Genauigkeit: SENSOR_STATUS_UNRELIABLE\n")
+                        activity?.runOnUiThread({
+                            run {
+                                magnetTxt.text = "%s".format("Magnetsensorgenauigkeit: unzuverlässig")
+                            }
+                        })
+                        Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensorgenauigkeit: SENSOR_STATUS_UNRELIABLE\n")
                     }
                     1 -> {
-                        Toast.makeText(activity, "Magnetsensor Genauigkeit: niedrig", Toast.LENGTH_SHORT).show()
-                        Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensor Genauigkeit: SENSOR_STATUS_ACCURACY_LOW\n")
+                        activity?.runOnUiThread({
+                            run {
+                                magnetTxt.text = "%s".format("Magnetsensorgenauigkeit: niedrig")
+                            }
+                        })
+                        Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensorgenauigkeit: SENSOR_STATUS_ACCURACY_LOW\n")
                     }
                     2 -> {
-                        Toast.makeText(activity, "Magnetsensor Genauigkeit: mittel", Toast.LENGTH_SHORT).show()
-                        Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensor Genauigkeit: SENSOR_STATUS_ACCURACY_MEDIUM\n")
+                        activity?.runOnUiThread({
+                            run {
+                                magnetTxt.text = "%s".format("Magnetsensorgenauigkeit: mittel")
+                            }
+                        })
+                        Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensorgenauigkeit: SENSOR_STATUS_ACCURACY_MEDIUM\n")
                     }
                     3 -> {
-                        Toast.makeText(activity, "Magnetsensor Genauigkeit: hoch", Toast.LENGTH_SHORT).show()
-                        Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensor Genauigkeit: SENSOR_STATUS_ACCURACY_HIGH\n")
+                        Toast.makeText(activity, "Magnetsensorgenauigkeit: hoch", Toast.LENGTH_LONG).show()
+                        Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensorgenauigkeit: SENSOR_STATUS_ACCURACY_HIGH\n")
                     }
                 }
             }

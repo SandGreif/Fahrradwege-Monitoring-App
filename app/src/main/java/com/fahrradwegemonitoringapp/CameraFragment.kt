@@ -148,6 +148,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Die Belichtungszeit der letzten Aufnahme
      */
     @Volatile private var exposureTime: Long = 0
+        @Synchronized get() {
+            return field
+        }
+        @Synchronized set(value) {
+            field = value
+        }
 
     /**
      * Die Belichtungsstartzeit der letzten Aufnahme in Nanosekunden seit Start der Java Virtual Machine(JVM).
@@ -205,12 +211,19 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private lateinit var previewRequest: CaptureRequest
 
     /**
-     * Der aktuelle Zustand um Bilder aufzunehmen.
+     * Aktuelle Zustand um Bilder aufzunehmen.
      * Der Anfangszustandand ist Preview. In welchem für die Preview Bilder aufgenommen werden.
-     *
+     * Auf diese Variable wird von mehereren Eventhandlern zugegriffen, wehshalb der Synchronized ist,
+     * um "Race Conditions" zu vermeiden
      * @see .captureCallback
      */
     private var state = STATE_PREVIEW
+        @Synchronized get() {
+            return field
+        }
+        @Synchronized set(value) {
+            field = value
+        }
 
     /**
      * [Semaphore] Wird benötigt um die Anwendung daran zu hindern die App zu schließen ohne die Kamera vorher zu schließen
@@ -438,6 +451,16 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun requestNextImage() {
         exposureTime = 0
         if(buttonCaptureRequestActive) {
+            if(state == STATE_PICTURE_TAKEN) { // Nach der Aufnahme eines einzelnen Bildes muss sichergestellt werden, dass
+                try {                          // wieder Konitnuirlich Bilder Aufgenommen werden
+                    captureSession?.setRepeatingRequest(previewRequest, captureCallback,
+                            backgroundHandler)
+                } catch (e: CameraAccessException) {
+                    Logger.writeToLogger(Exception().stackTrace[0], e.toString())
+                    Log.e(TAG, e.toString())
+                }
+                Logger.writeToLogger(Exception().stackTrace[0], "state war STATE_PICTURE_TAKEN")
+            }
             state = STATE_TAKE_PICTURE
         } else {
             activeImageCapturing = false
@@ -1032,3 +1055,4 @@ class CameraFragment : Fragment(), View.OnClickListener,
         @JvmStatic fun newInstance(): CameraFragment = CameraFragment()
     }
 }
+

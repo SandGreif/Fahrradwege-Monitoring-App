@@ -14,6 +14,7 @@
  limitations under the License.
 -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -44,6 +45,18 @@
         android:fontFamily="sans-serif-condensed"
         android:text="@string/speedTxt"
         android:textColor="?android:attr/colorBackground"
+        android:textSize="24sp" />
+
+    <TextView
+        android:id="@+id/magnetTxt"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/imageCounterTxt"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="40dp"
+        android:fontFamily="sans-serif-condensed"
+        android:text="@string/magnetTxt"
+        android:textColor="@android:color/holo_red_dark"
         android:textSize="24sp" />
 
     <TextView
