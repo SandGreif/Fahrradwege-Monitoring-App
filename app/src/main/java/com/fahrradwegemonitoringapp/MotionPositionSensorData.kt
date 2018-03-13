@@ -222,7 +222,8 @@ class MotionPositionSensorData : SensorEventListener  {
             val azimuthListFinish = azimuthList?.toMutableList()?.subList(indecis[0], indecis[1])
             val pitchListFinish = pitchList?.toMutableList()?.subList(indecis[0], indecis[1])
             val rollListFinish = rollList?.toMutableList()?.subList(indecis[0], indecis[1])
-            return "%s,%s,%s,%s,%s,%s,%s,%s".format(
+            val startExposureTimeOffset = startExposureTime - calcOffsetExposure(exposureTime)
+            return "%s,%s,%s,%s,%s,%s,%s,%s,%s".format(
                     calcStringList(xListFinish),
                     calcStringList(yListFinish),
                     calcStringList(zListFinish),
@@ -230,7 +231,8 @@ class MotionPositionSensorData : SensorEventListener  {
                     calcStringList(pitchListFinish),
                     calcStringList(rollListFinish),
                     calcTimeStringList(timestampsFinish,exposureTime,startExposureTime),
-                    "${xListFinish?.size}")
+                    "${xListFinish?.size}",
+                    "$startExposureTimeOffset")
         }
         return null
     }
@@ -252,7 +254,6 @@ class MotionPositionSensorData : SensorEventListener  {
 
     /**
      * Gibt die Sensorzeitstempel als Nanosekunden in String Form zurück
-     * dabei ist der erste Messwert die Ns seit start der Erfassung
      * Prec. Anzahl der Elmenete in Liste > 0
      * Postc. String wird zurück gegeben
      */

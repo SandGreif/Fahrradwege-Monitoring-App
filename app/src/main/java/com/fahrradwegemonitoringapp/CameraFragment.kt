@@ -437,9 +437,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun saveFeatures(timestamp : Long) {
         val latitude = location?.latitude?.toFloat()
         val longitude = location?.longitude?.toFloat()
-        val accelerometerString = motionPositionSensorData?.getData(exposureTimeStart,exposureTime)
+        val motionDataString = motionPositionSensorData?.getData(exposureTimeStart,exposureTime)
         fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s\n".format(
-                "$timestamp","$latitude","$longitude","$speed","$accelerometerString",
+                "$timestamp","$latitude","$longitude","$speed","$motionDataString",
                 "${motionPositionSensorData?.getFirstTimestamp()}",
                 "$exposureTimeStart","$exposureTime"))
     }
@@ -480,9 +480,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("merkmaleRoh.csv"))
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "Zeitstempel","Breitengrad","Laengengrad","Geschwindigkeit","AccelerometerX","AccelerometerY","AccelerometerZ",
-                "Azimuth","Nick","Roll","SensorZeitstempel","Messwerte","StartBewegungsD","StartBelichtung","Belichtungszeit"))
+                "Azimuth","Nick","Roll","SensorZeitstempel","Messwerte","StartZeitfenster","StartBewegungsdaten","StartBelichtung","Belichtungszeit"))
     }
 
     override fun onCreateView(inflater: LayoutInflater,
