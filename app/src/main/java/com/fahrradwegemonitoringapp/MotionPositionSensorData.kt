@@ -212,7 +212,7 @@ class MotionPositionSensorData : SensorEventListener  {
     */
     fun getData( startExposureTime : Long, exposureTime : Long) : String? {
         if(!isDataGatheringActive && exposureTime <= MAX_TIMEFRAME) {
-            val indecis = getTimeframeIndecis(startExposureTime,exposureTime)
+            val indecis = getTimeframeIndecis(timestampsList,startExposureTime,exposureTime)
             // Über die Exemplarvariablen Listen kann nicht iterriert werden, weil in einem Thread
             // über den Listener paralle auf diese zugegriffen wird. Deshalb werden die Listen kopiert
             val xListFinish = xAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
@@ -282,16 +282,16 @@ class MotionPositionSensorData : SensorEventListener  {
     /**
      * Diese Funktion berechnet den Startindex und den Stoppindex eines Zeitfensterns.
      * Die länge des Zeitfensters ist abhängig von der Belichtungszeit.
-     * Prec.: exposureTime <= MAX_EXPOSURE_TIME
+     * Prec.: exposureTime <= MAX_EXPOSURE_TIME && startExposureTime >= 0 && exposureTime > 0
      * Postc.: Array mit den zwei Indexen
      */
-    private fun getTimeframeIndecis( startExposureTime : Long, exposureTime : Long) : IntArray {
+    fun getTimeframeIndecis( list : MutableList<Long>?, startExposureTime : Long, exposureTime : Long) : IntArray {
         val indecis = IntArray(2)
         var i = 0
         var diffStart : Long = 0
         var startFound = false
         val offsetExposure = calcOffsetExposure(exposureTime) // Berechnet Offset-Zeit
-        val timestampFinish = timestampsList?.toMutableList()
+        val timestampFinish = list?.toMutableList()
         val startExposureTimeOffset = startExposureTime - offsetExposure
         val stopExposureTimeOffset = startExposureTime + exposureTime + offsetExposure
         timestampFinish?.forEach {
@@ -369,18 +369,14 @@ class MotionPositionSensorData : SensorEventListener  {
     fun calculateMean(list : MutableList<Float>?) : Float {
         var sum = 0f
         val samples = list?.size
-        val result : Float
+        var result  = 0f
         if (samples != null) {
             if (samples > 0) {
                 list.forEach {
                     sum += it
                 }
                 result =  sum / samples
-            } else {
-                result = 0f
             }
-        } else {
-            result = 0f
         }
         return result
     }

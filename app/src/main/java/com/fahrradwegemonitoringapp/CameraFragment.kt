@@ -358,30 +358,30 @@ class CameraFragment : Fragment(), View.OnClickListener,
             if (location != null) {
                 if(stopDataCapturing()) {
                     speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
-                   // if ((((speed - 5.0f) > 0.0001)) && ((speed - 25.0f) < 0.0001)) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
-                    if (imageCounter % (2000 * directoriesCounter) == 0) {
-                        newFolder()
-                    }
-                    val thread = Thread {
-                        saveFeatures(timeMs)
-                    }
-                    thread.start()
-                    saveImage(image, timeMs)
-                    try {
-                        thread.join()
-                    } catch (e: Exception) {
-                        Logger.writeToLogger(Exception().stackTrace[0],e.toString())
-                        throw e
-                    }
-                    activity.runOnUiThread({
-                        run {
-                            imageCounterTxt.text = "%d %s".format(imageCounter, "Bilder")
-                            speedTxt.text = "%s %s".format(df.format(speed), " km/h")
+                    if ((((speed - 5.0f) > 0.0001)) && ((speed - 25.0f) < 0.0001)) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
+                        if (imageCounter % (2000 * directoriesCounter) == 0) {
+                            newFolder()
                         }
-                    })
-                  //  } else {
-                   //     image.close()
-                  //  }
+                        val thread = Thread {
+                            saveFeatures(timeMs)
+                        }
+                        thread.start()
+                        saveImage(image, timeMs)
+                        try {
+                            thread.join()
+                        } catch (e: Exception) {
+                            Logger.writeToLogger(Exception().stackTrace[0],e.toString())
+                            throw e
+                        }
+                        activity.runOnUiThread({
+                            run {
+                                imageCounterTxt.text = "%d %s".format(imageCounter, "Bilder")
+                                speedTxt.text = "%s %s".format(df.format(speed), " km/h")
+                            }
+                        })
+                    } else {
+                        image.close()
+                    }
                 } else {
                     Logger.writeToLogger(Exception().stackTrace[0],"Belichtungszeit war 0")
                     image.close()
