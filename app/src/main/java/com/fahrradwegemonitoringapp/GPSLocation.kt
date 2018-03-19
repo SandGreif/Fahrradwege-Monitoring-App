@@ -86,7 +86,7 @@ class GPSLocation(private val activity: Activity)  {
                         Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
             // Registriert den listener mit den Location Manager um Lokations Updates zu erhalten
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 200, 1f, locationListener)
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0f, locationListener)
         }
 
     }

@@ -288,7 +288,6 @@ class MotionPositionSensorData : SensorEventListener  {
     fun getTimeframeIndecis( list : MutableList<Long>?, startExposureTime : Long, exposureTime : Long) : IntArray {
         val indecis = IntArray(2)
         var i = 0
-        var diffStart : Long = 0
         var startFound = false
         val offsetExposure = calcOffsetExposure(exposureTime) // Berechnet Offset-Zeit
         val timestampFinish = list?.toMutableList()
@@ -296,10 +295,9 @@ class MotionPositionSensorData : SensorEventListener  {
         val stopExposureTimeOffset = startExposureTime + exposureTime + offsetExposure
         timestampFinish?.forEach {
             if (!startFound && it >= startExposureTimeOffset) {
-                diffStart = it - startExposureTimeOffset
                 indecis[0] = i
                 startFound = true
-            } else if (startFound && it + diffStart <= stopExposureTimeOffset) {
+            } else if (startFound && it <= stopExposureTimeOffset) {
                 indecis[1] = i
             } else if(startFound){
                 return@forEach
