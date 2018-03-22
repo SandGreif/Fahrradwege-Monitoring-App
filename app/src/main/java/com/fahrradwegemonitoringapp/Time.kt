@@ -3,8 +3,8 @@ package com.fahrradwegemonitoringapp
 import java.util.*
 
 /**
- * This class include all time relatet implementation.
- * Such as Calender and Date abstraction
+ * Diese Klasse beinhaltet bietet die Möglichkeit verschiedene Zeitwerte Zeitformate zu erhalten.
+ * Wie das aktuelle Datum und die Unixzeit
  * Created by morro on 29.01.2018.
  */
 
@@ -13,8 +13,9 @@ class Time {
     private var calendar : Calendar = Calendar.getInstance()
 
     /**
+     * Aktuelles Datum des gregorianischen Kalenders in dem Format "YEAR_MONTH_DAY_HOUR_MINUTE"
      * Prec.: /
-     * Post.: return String in the date form "YEAR_MONTH_DAY_HOUR_MINUTE"
+     * Post.: Gibt Datum als String zurück
      */
     fun getDay(): String{
         val year = calendar.get(Calendar.YEAR)
@@ -26,8 +27,8 @@ class Time {
     }
 
     /**
-     * Prec.: /
-     * Post.: return String in the date form "YEAR_MONTH_DAY_HOUR_MINUTE_SECOND_MS"
+     * Aktuelles Datum des gregorianischen Kalenders in dem Format "YEAR_MONTH_DAY_HOUR_MINUTE_SECOND_MS"
+     * Post.: Gibt Datum als String zurück
      */
     fun getDayMs(): String{
         calendar = Calendar.getInstance()
@@ -42,13 +43,13 @@ class Time {
     }
 
     /**
+     * Gibt die Unixzeit zurück oder auch "Epoch" genannt
      * Prec.: /
-     * Postc.: return ms since 1970
+     * Postc.: Gibt die vergangene Zeit in Ms als String zurück
      */
     fun getTime(): Long{
         return Date().time
     }
-
 
 }
 
