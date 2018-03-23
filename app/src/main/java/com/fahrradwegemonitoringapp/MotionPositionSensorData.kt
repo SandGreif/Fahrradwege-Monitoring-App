@@ -28,6 +28,16 @@ class MotionPositionSensorData : SensorEventListener  {
     private lateinit var magnetTxt : TextView
 
     /**
+     * Klasse um die aktuelle Zeit und Datum zu erhalten
+     */
+    private lateinit var time: Time
+
+    /**
+     * Aktuelste Event Zeitstempel in Unixzeit
+     */
+    private var stopTimestampMs : Long = 0
+
+    /**
      * Listen zum zwischenspeichern der Beschleunigungssensordaten x,y,z
      */
     private var xAxisList: MutableList<Float>? = null
@@ -40,9 +50,9 @@ class MotionPositionSensorData : SensorEventListener  {
     private var rollList: MutableList<Float>? = null
 
     /**
-     * Zeitstempel innerhalb eines Zeitfensters,
+     * Zeitstempel innerhalb eines Zeitfensters in Nanosekunden seit Start der Java Vm,
      */
-    private var timestampsList: MutableList<Long>? = null
+    private var timestampsNsList: MutableList<Long>? = null
 
     /**
      *  In diesen Variablen stehen die Kallibrierungsoffsets für
@@ -100,6 +110,7 @@ class MotionPositionSensorData : SensorEventListener  {
         df.roundingMode = RoundingMode.CEILING
         this.activity = activity
         this.location = location
+        time = Time()
         mSensorManager = activity.getSystemService(Context.SENSOR_SERVICE) as SensorManager?
         mAccelerometer = mSensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         mSensorManager?.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_FASTEST)
@@ -111,7 +122,7 @@ class MotionPositionSensorData : SensorEventListener  {
         azimuthList = mutableListOf()
         pitchList = mutableListOf()
         rollList = mutableListOf()
-        timestampsList = mutableListOf()
+        timestampsNsList = mutableListOf()
         magnetTxt = activity.findViewById(R.id.magnetTxt) as TextView
     }
 
@@ -154,7 +165,8 @@ class MotionPositionSensorData : SensorEventListener  {
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
-        val timestamp = System.nanoTime()
+        val timestampNs = time.getTimeNanoSec()
+        val timestampMs = time.getTime()
         val sensorType = event?.sensor?.type
         when (sensorType) {
             Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
@@ -196,7 +208,8 @@ class MotionPositionSensorData : SensorEventListener  {
                 xAxisList?.add(event.values[0] - gravity[0] - xOffset)
                 yAxisList?.add(event.values[1] - gravity[1] - yOffset)
                 zAxisList?.add(event.values[2] - gravity[2] - zOffset)
-                timestampsList?.add(timestamp)
+                timestampsNsList?.add(timestampNs)
+                stopTimestampMs = timestampMs
             }
         }
     }
@@ -212,11 +225,11 @@ class MotionPositionSensorData : SensorEventListener  {
     */
     fun getData( startExposureTime : Long, exposureTime : Long) : String? {
         if(!isDataGatheringActive && exposureTime <= MAX_TIMEFRAME) {
-            val indecis = getTimeframeIndecis(timestampsList,startExposureTime,exposureTime)
+            val indecis = getTimeframeIndecis(timestampsNsList,startExposureTime,exposureTime)
             // Über die Exemplarvariablen Listen kann nicht iterriert werden, weil in einem Thread
             // über den Listener paralle auf diese zugegriffen wird. Deshalb werden die Listen kopiert
             val xListFinish = xAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
-            val timestampsFinish = timestampsList?.toMutableList()?.subList(indecis[0], indecis[1])
+            val timestampsFinish = timestampsNsList?.toMutableList()?.subList(indecis[0], indecis[1])
             val yListFinish = yAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
             val zListFinish = zAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
             val azimuthListFinish = azimuthList?.toMutableList()?.subList(indecis[0], indecis[1])
@@ -335,6 +348,7 @@ class MotionPositionSensorData : SensorEventListener  {
         }
     }
 
+
     /**
      * Die Funktion entfernt alle Elemente aus den Datenlisten:
      * xAxisList, yAxisList, zAxisList, azimuthList, pitchList, rollList
@@ -342,7 +356,8 @@ class MotionPositionSensorData : SensorEventListener  {
      * Postc.: Die angegebenen Listen haben keine Elemente mehr
      */
     fun clearData() {
-        timestampsList?.clear()
+        timestampsNsList?.clear()
+        stopTimestampMs = 0
         xAxisList?.clear()
         yAxisList?.clear()
         zAxisList?.clear()
@@ -353,11 +368,21 @@ class MotionPositionSensorData : SensorEventListener  {
 
     fun getFirstTimestamp() : Long? {
         var result : Long? = -1
-        if(timestampsList?.isNotEmpty()!!)
-            result = timestampsList?.first()
+        if(timestampsNsList?.isNotEmpty()!!)
+            result = timestampsNsList?.first()
         return result
     }
 
+    fun getLastTimestamp() : Long? {
+        var result : Long? = -1
+        if(timestampsNsList?.isNotEmpty()!!)
+            result = timestampsNsList?.last()
+        return result
+    }
+
+    fun getStopTimestampMs() : Long {
+        return stopTimestampMs
+    }
     /**
      * Berechnet den  Mittelwert über die Float Elemente einer Liste.
      * Prec.:

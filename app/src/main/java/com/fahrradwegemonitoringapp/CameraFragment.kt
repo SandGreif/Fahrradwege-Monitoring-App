@@ -429,10 +429,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val latitude = location?.latitude?.toFloat()
         val longitude = location?.longitude?.toFloat()
         val motionDataString = motionPositionSensorData?.getData(exposureTimeStart,exposureTime)
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s\n".format(
-                "$timestamp","$latitude","$longitude","$speed","$motionDataString",
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+                "$timestamp","$latitude","$longitude","$speed",location?.altitude?.toFloat(),"$motionDataString",
                 "${motionPositionSensorData?.getFirstTimestamp()}",
-                "$exposureTimeStart","$exposureTime"))
+                "$exposureTimeStart","$exposureTime","${motionPositionSensorData?.getLastTimestamp()}","${motionPositionSensorData?.getStopTimestampMs()}"))
     }
 
     /**
@@ -471,9 +471,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("merkmaleRoh.csv"))
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
-                "Zeitstempel","Breitengrad","Laengengrad","Geschwindigkeit","AccelerometerX","AccelerometerY","AccelerometerZ",
-                "Azimuth","Nick","Roll","SensorZeitstempel","Messwerte","StartZeitfenster","StartBewegungsdaten","StartBelichtung","Belichtungszeit"))
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+                "Zeitstempel in Unixzeit","Breitengrad","Laengengrad","Hoehe in m ueber WGS 84","Geschwindigkeit in km/h","X-Achse Beschleunigungswerte in m/s^2","Y-Achse Beschleunigungswerte in m/s^2","Z-Achse Beschleunigungswerte in m/s^2",
+                "Gier Messwerte in rad","Nick Messwerte in rad","Roll Messwerte in rad","Zeitstempel der Messwerte in ns","Anzahl der Messwerte","Start des Zeitfensters in ns seit Start der JVM","Start der Messwerterfassung in ns seit Start der JVM",
+                "Start der Belichtung in ns seit Start der JVM","Belichtungszeit in ns","Letzter Zeitstempel der Messwerterfassung in ns seit Start der JVM","Stopp der Messwerterfassung in Unixzeit"))
     }
 
     override fun onCreateView(inflater: LayoutInflater,

@@ -51,6 +51,12 @@ class Time {
         return Date().time
     }
 
+    /**
+     * Gibt die aktuelle Zeit seit dem Start der Java VM in Nenosekunden zurück
+     */
+    fun getTimeNanoSec() : Long {
+        return System.nanoTime()
+    }
 }
 
 
