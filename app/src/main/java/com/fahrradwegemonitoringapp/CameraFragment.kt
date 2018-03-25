@@ -473,8 +473,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
         fileLocation = File(actualDirectory, ("merkmaleRoh.csv"))
         fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "Zeitstempel in Unixzeit","Breitengrad","Laengengrad","Geschwindigkeit in km/h","X-Achse Beschleunigungswerte in m/s^2","Y-Achse Beschleunigungswerte in m/s^2","Z-Achse Beschleunigungswerte in m/s^2",
-                "Gier Messwerte in rad","Nick Messwerte in rad","Roll Messwerte in rad","Zeitstempel der Messwerte in ns","Anzahl der Messwerte","Start des Zeitfensters in ns seit Start der JVM","Start der Messwerterfassung in ns seit Start der JVM",
-                "Start der Belichtung in ns seit Start der JVM","Belichtungszeit in ns","Letzter Zeitstempel der Messwerterfassung in ns seit Start der JVM","Stopp der Messwerterfassung in Unixzeit"))
+                "Gier Messwerte in rad","Nick Messwerte in rad","Roll Messwerte in rad","Zeitstempel der Messwerte in ns","Anzahl der Messwerte","Start des Zeitfensters in ns seit Start der JVM",
+                "Start der Messwerterfassung in ns seit Start der JVM","Start der Belichtung in ns seit Start der JVM","Belichtungszeit in ns",
+                "Letzter Zeitstempel der Messwerterfassung in ns seit Start der JVM","Stopp der Messwerterfassung in Unixzeit"))
     }
 
     override fun onCreateView(inflater: LayoutInflater,
@@ -535,8 +536,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
     override fun onPause() {
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
             Logger.writeToLogger(Exception().stackTrace[0],"")
-        closeCamera()
-        stopBackgroundThread()
         super.onPause()
     }
 
