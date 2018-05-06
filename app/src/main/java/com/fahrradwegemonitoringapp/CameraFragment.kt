@@ -883,6 +883,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 abortCaptures()
             }
             motionPositionSensorData?.startDataCollection()
+            Thread.sleep(200)
             captureSession?.capture(captureBuilder?.build(), captureCallback, null)
 
         } catch (e: CameraAccessException) {

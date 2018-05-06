@@ -113,9 +113,9 @@ class MotionPositionSensorData : SensorEventListener  {
         time = Time()
         mSensorManager = activity.getSystemService(Context.SENSOR_SERVICE) as SensorManager?
         mAccelerometer = mSensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        mSensorManager?.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_FASTEST)
+        mSensorManager?.registerListener(this, mAccelerometer, 10000)
         mMagneticField = mSensorManager?.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
-        mSensorManager?.registerListener(this, mMagneticField, SensorManager.SENSOR_DELAY_FASTEST)
+        mSensorManager?.registerListener(this, mMagneticField, 10000)
         xAxisList = mutableListOf()
         yAxisList = mutableListOf()
         zAxisList = mutableListOf()
