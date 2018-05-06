@@ -358,7 +358,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
             if (location != null) {
                 if(stopDataCapturing()) {
                     speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
-                    if ((((speed - 5.0f) > 0.0001)) && ((speed - 25.0f) < 0.0001)) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
+                   // if ((((speed - 5.0f) > 0.0001)) && ((speed - 25.0f) < 0.0001)) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
                         if (imageCounter % (2000 * directoriesCounter) == 0) {
                             newFolder()
                         }
@@ -377,9 +377,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     Logger.writeToLogger(Exception().stackTrace[0],"Belichtungszeit war 0")
                     image.close()
                 }
-            } else {
-                image.close()
-            }
+         //   } else {
+        //        image.close()
+         //   }
         }
         requestNextImage()
     }
@@ -397,7 +397,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         if((System.nanoTime() - exposureTimeStart + exposureTime) < MAX_TIMEFRAME) {
             // Ausreichend Zeit für die Bewegungssensordatenerfassung gewährleisten
             try {
-                Thread.sleep(MAX_TIMEFRAME -((System.nanoTime() - exposureTimeStart) + exposureTime))
+                Thread.sleep((MAX_TIMEFRAME -((System.nanoTime() - exposureTimeStart) + exposureTime))/1000000)
             } catch (e: IllegalArgumentException) {
                 Logger.writeToLogger(Exception().stackTrace[0],e.toString())
             }
@@ -883,7 +883,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 abortCaptures()
             }
             motionPositionSensorData?.startDataCollection()
-            Thread.sleep(200)
+            try {
+                  Thread.sleep(200)
+            } catch (e: IllegalArgumentException) {
+                Logger.writeToLogger(Exception().stackTrace[0],e.toString())
+            }
             captureSession?.capture(captureBuilder?.build(), captureCallback, null)
 
         } catch (e: CameraAccessException) {
