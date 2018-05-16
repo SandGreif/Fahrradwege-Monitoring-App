@@ -269,7 +269,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
                     if (aeState == null || aeState != CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
                         state = STATE_PICTURE_TAKEN
-                        Logger.writeToLogger(Exception().stackTrace[0]," STATE_PICTURE_TAKEN")
+                        Logger.writeToLogger(Exception().stackTrace[0],"STATE_PICTURE_TAKEN")
                         captureStillPicture()
                     }
                 }
@@ -277,6 +277,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
         }
 
         private fun capturePicture(result: CaptureResult) {
+            motionPositionSensorData?.startDataCollection()
+            try {
+                Thread.sleep(360)
+            } catch (e: IllegalArgumentException) {
+                Logger.writeToLogger(Exception().stackTrace[0],e.toString())
+            }
             val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
             if (aeState == null || aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
                 state = STATE_PICTURE_TAKEN
@@ -358,11 +364,19 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private val onImageAvailableListener = OnImageAvailableListener {
         val timeMs = time.getTime()
         val image = it.acquireLatestImage()
+        val actualSpeed: Float?
         if (image != null) {
             if (location != null) {
+                if(location?.hasSpeed()!! && location?.speed!! > 0) {
+                    actualSpeed = location?.speed!!
+                    dynamicTimeframe = ((1 / actualSpeed) * 1000000000).toLong()
+                } else {
+                    dynamicTimeframe = 720000000
+                }
                 if(stopDataCapturing()) {
                     speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
                     if ((((speed - 5.0f) > 0.0001)) && ((speed - 25.0f) < 0.0001)) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
+                        // Berechnung des dynamischen Zeitfensters
                         if (imageCounter % (2000 * directoriesCounter) == 0) {
                             newFolder()
                         }
@@ -378,12 +392,14 @@ class CameraFragment : Fragment(), View.OnClickListener,
                         image.close()
                     }
                 } else {
-                    Logger.writeToLogger(Exception().stackTrace[0],"Belichtungszeit war 0")
+                    Logger.writeToLogger(Exception().stackTrace[0],"Belichtungszeit war 0 ns")
                     image.close()
                 }
               } else {
                 image.close()
            }
+        } else {
+            image?.close()
         }
         requestNextImage()
     }
@@ -391,7 +407,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     /**
      * Stoppt die erfassung der Bewegungssensor und Positionsdaten
      * Prec.: sollte aufgerufen werden von der Methode onImageAvailableListener
-     * Postc.: Datenerfassung gestoppt. Rückgabewert True, wenn Belichtungszeit größer als 0
+     * Postc.: Datenerfassung gestoppt. Rückgabewert True, wenn Belichtungszeit größer als 0 war
      *        Die Belichtung kann 0 sein, wenn der Listener onImageAvailableListener vor den
      *        Handler onCaptureComplete aufgerufen wurde
      */
@@ -437,6 +453,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 "$timestamp","$latitude","$longitude","$speed","$motionDataString",
                 "${motionPositionSensorData?.getFirstTimestamp()}",
                 "$exposureTimeStart","$exposureTime","${motionPositionSensorData?.getLastTimestamp()}","${motionPositionSensorData?.getStopTimestampMs()}"))
+        Logger.writeToLogger(Exception().stackTrace[0],"saveFeatures")
     }
 
     /**
@@ -831,21 +848,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
      *
      */
     private fun captureStillPicture() {
-        val actualSpeed: Float?
-        // Berechnung des dynamischen Zeitfensters
-        if(gpsLocation?.getLocation() != null && gpsLocation?.getLocation()?.hasSpeed()!!) {
-            if((speed - 5.0f) > 0.0001) {
-                actualSpeed = gpsLocation?.getLocation()?.speed
-                dynamicTimeframe = ((1 / actualSpeed!!) * 1000000000).toLong()
-            } else {
-                dynamicTimeframe =  720000000
-            }
-        } else {
-            dynamicTimeframe = 720000000
-        }
         try {
             if (activity == null || cameraDevice == null) {
-                Logger.writeToLogger(Exception().stackTrace[0],"activity oder cameraDevice glich null")
+                Logger.writeToLogger(Exception().stackTrace[0],"activity oder cameraDevice gleich null")
                 return
             }
             motionPositionSensorData?.clearData() // Vor der Aufnahme werden die letzten erfassten Sensordaten(Beschl./Gier-Roll-Nick) entfernt
@@ -889,23 +894,17 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     if(result.frameNumber == frameNumberStart) { // Nur wenn die Frame Nummern übereinstimmen ist dies das einzelne angefragte Bild
                         exposureTime = result.get(CaptureResult.SENSOR_EXPOSURE_TIME)
                         // Nach der Aufnahme wird der Kamera Zustand auf preview gesetzt
+                        Logger.writeToLogger(Exception().stackTrace[0],"onCaptureCompleted")
                         setRepeatingPreviewRequest()
                     }
                 }
             }
-            // In diesem Block wird die Konitinuierlich Aufnahme von Bildern abgebrochen
+            // In diesem Block wird die Kontinuierliche Aufnahme von Bildern abgebrochen
             captureSession?.apply {
                 stopRepeating()
                 abortCaptures()
             }
-            motionPositionSensorData?.startDataCollection()
-            try {
-                  Thread.sleep(((dynamicTimeframe/2)/1000000))
-            } catch (e: IllegalArgumentException) {
-                Logger.writeToLogger(Exception().stackTrace[0],e.toString())
-            }
             captureSession?.capture(captureBuilder?.build(), captureCallback, null)
-
         } catch (e: CameraAccessException) {
             Logger.writeToLogger(Exception().stackTrace[0],"CameraAccessException")
             Log.e(TAG, e.toString())
