@@ -40,14 +40,9 @@ class MotionPositionSensorData : SensorEventListener  {
     /**
      * Listen zum zwischenspeichern der Beschleunigungssensordaten x,y,z
      */
-    private var xAxisList: MutableList<Float>? = null
-    private var yAxisList: MutableList<Float>? = null
     private var zAxisList: MutableList<Float>? = null
 
-
-    private var azimuthList: MutableList<Float>? = null
     private var pitchList: MutableList<Float>? = null
-    private var rollList: MutableList<Float>? = null
 
     /**
      * Zeitstempel innerhalb eines Zeitfensters in Nanosekunden seit Start der Java Vm,
@@ -59,9 +54,6 @@ class MotionPositionSensorData : SensorEventListener  {
      *  Roll und Nick Winkel sowie die Beschleunigungssensorachsen X,Y,Z
      */
     private var pitchOffset: Float = 0.0f
-    private var rollOffset: Float = 0.0f
-    private var xOffset: Float = 0.0f
-    private var yOffset: Float = 0.0f
     private var zOffset: Float = 0.0f
 
     // Current data from accelerometer & magnetometer.  The arrays hold values
@@ -107,21 +99,18 @@ class MotionPositionSensorData : SensorEventListener  {
      */
     fun init(activity: Activity, location: GPSLocation) {
         // Datenwerte sollen aufgerunded werden auf 5 Kommastellen
+        var samplingPeriodMicroS = 8000
         df.roundingMode = RoundingMode.CEILING
         this.activity = activity
         this.location = location
         time = Time()
         mSensorManager = activity.getSystemService(Context.SENSOR_SERVICE) as SensorManager?
         mAccelerometer = mSensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        mSensorManager?.registerListener(this, mAccelerometer, 10000)
+        mSensorManager?.registerListener(this, mAccelerometer, samplingPeriodMicroS)
         mMagneticField = mSensorManager?.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
-        mSensorManager?.registerListener(this, mMagneticField, 10000)
-        xAxisList = mutableListOf()
-        yAxisList = mutableListOf()
+        mSensorManager?.registerListener(this, mMagneticField, samplingPeriodMicroS)
         zAxisList = mutableListOf()
-        azimuthList = mutableListOf()
         pitchList = mutableListOf()
-        rollList = mutableListOf()
         timestampsNsList = mutableListOf()
         magnetTxt = activity.findViewById(R.id.magnetTxt) as TextView
     }
@@ -202,11 +191,7 @@ class MotionPositionSensorData : SensorEventListener  {
                             System.currentTimeMillis())
                     azimuth += geoField.declination // Berechnet den magnetischen Norden zu den geografischen Norden
                 }
-                azimuthList?.add(azimuth * (PI.toFloat() / 180))
                 pitchList?.add(orientationValues[1] - pitchOffset)
-                rollList?.add(orientationValues[2] - rollOffset)
-                xAxisList?.add(event.values[0] - gravity[0] - xOffset)
-                yAxisList?.add(event.values[1] - gravity[1] - yOffset)
                 zAxisList?.add(event.values[2] - gravity[2] - zOffset)
                 timestampsNsList?.add(timestampNs)
                 stopTimestampMs = timestampMs
@@ -223,28 +208,20 @@ class MotionPositionSensorData : SensorEventListener  {
     *  Prec.:
      * Postc.: Gibt berechnete Daten als String zurück, wenn isDataGatheringActive ist true ansonsten null
     */
-    fun getData( startExposureTime : Long, exposureTime : Long) : String? {
-        if(!isDataGatheringActive && exposureTime <= MAX_TIMEFRAME) {
-            val indecis = getTimeframeIndecis(timestampsNsList,startExposureTime,exposureTime)
+    fun getData( startExposureTime : Long, exposureTime : Long, dynamicTimeframe : Long) : String? {
+        if(!isDataGatheringActive && exposureTime <= dynamicTimeframe) {
+            val indecis = getTimeframeIndecis(timestampsNsList,startExposureTime,exposureTime, dynamicTimeframe)
             // Über die Exemplarvariablen Listen kann nicht iterriert werden, weil in einem Thread
             // über den Listener paralle auf diese zugegriffen wird. Deshalb werden die Listen kopiert
-            val xListFinish = xAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
             val timestampsFinish = timestampsNsList?.toMutableList()?.subList(indecis[0], indecis[1])
-            val yListFinish = yAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
             val zListFinish = zAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
-            val azimuthListFinish = azimuthList?.toMutableList()?.subList(indecis[0], indecis[1])
             val pitchListFinish = pitchList?.toMutableList()?.subList(indecis[0], indecis[1])
-            val rollListFinish = rollList?.toMutableList()?.subList(indecis[0], indecis[1])
-            val startExposureTimeOffset = startExposureTime - calcOffsetExposure(exposureTime)
-            return "%s,%s,%s,%s,%s,%s,%s,%s,%s".format(
-                    calcStringList(xListFinish),
-                    calcStringList(yListFinish),
+            val startExposureTimeOffset = startExposureTime - calcOffsetExposure(exposureTime, dynamicTimeframe)
+            return "%s,%s,%s,%s,%s".format(
                     calcStringList(zListFinish),
-                    calcStringList(azimuthListFinish),
                     calcStringList(pitchListFinish),
-                    calcStringList(rollListFinish),
-                    calcTimeStringList(timestampsFinish,exposureTime,startExposureTime),
-                    "${xListFinish?.size}",
+                    calcTimeStringList(timestampsFinish,exposureTime,startExposureTime,dynamicTimeframe),
+                    "${zListFinish?.size}",
                     "$startExposureTimeOffset")
         }
         return null
@@ -270,10 +247,10 @@ class MotionPositionSensorData : SensorEventListener  {
      * Prec. Anzahl der Elmenete in Liste > 0
      * Postc. String wird zurück gegeben
      */
-    private fun calcTimeStringList(list : MutableList<Long>?, exposureTime : Long, startExposureTime : Long) : String {
+    private fun calcTimeStringList(list : MutableList<Long>?, exposureTime : Long, startExposureTime : Long, dynamicTimeframe : Long) : String {
         var result = ""
         val startTimeNs = list?.first()
-        val offsetExposure = calcOffsetExposure(exposureTime)
+        val offsetExposure = calcOffsetExposure(exposureTime, dynamicTimeframe)
         val startExposureTimeOffset = startExposureTime - offsetExposure
         val diffStart = startTimeNs!! - startExposureTimeOffset
         list.forEach {
@@ -287,8 +264,8 @@ class MotionPositionSensorData : SensorEventListener  {
      * Prec. exposureTime > 0
      * Postc. berechneter Offset
      */
-    private fun calcOffsetExposure(exposureTime : Long) : Long {
-        val exposureDiff = MAX_TIMEFRAME - exposureTime
+    private fun calcOffsetExposure(exposureTime : Long, dynamicTimeframe : Long) : Long {
+        val exposureDiff = dynamicTimeframe - exposureTime
         return exposureDiff / 2
     }
 
@@ -298,11 +275,11 @@ class MotionPositionSensorData : SensorEventListener  {
      * Prec.: exposureTime <= MAX_EXPOSURE_TIME && startExposureTime >= 0 && exposureTime > 0
      * Postc.: Array mit den zwei Indexen
      */
-    fun getTimeframeIndecis( list : MutableList<Long>?, startExposureTime : Long, exposureTime : Long) : IntArray {
+    fun getTimeframeIndecis( list : MutableList<Long>?, startExposureTime : Long, exposureTime : Long, dynamicTimeframe : Long) : IntArray {
         val indecis = IntArray(2)
         var i = 0
         var startFound = false
-        val offsetExposure = calcOffsetExposure(exposureTime) // Berechnet Offset-Zeit
+        val offsetExposure = calcOffsetExposure(exposureTime, dynamicTimeframe ) // Berechnet Offset-Zeit
         val timestampFinish = list?.toMutableList()
         val startExposureTimeOffset = startExposureTime - offsetExposure
         val stopExposureTimeOffset = startExposureTime + exposureTime + offsetExposure
@@ -358,12 +335,8 @@ class MotionPositionSensorData : SensorEventListener  {
     fun clearData() {
         timestampsNsList?.clear()
         stopTimestampMs = 0
-        xAxisList?.clear()
-        yAxisList?.clear()
         zAxisList?.clear()
-        azimuthList?.clear()
         pitchList?.clear()
-        rollList?.clear()
     }
 
     fun getFirstTimestamp() : Long? {
@@ -423,10 +396,7 @@ class MotionPositionSensorData : SensorEventListener  {
      */
     fun stopCalibration() {
         isDataGatheringActive = false
-        xOffset =calculateMean(xAxisList?.toMutableList())
-        yOffset = calculateMean(yAxisList?.toMutableList())
         zOffset = calculateMean(zAxisList?.toMutableList())
         pitchOffset = calculateMean(pitchList?.toMutableList())
-        rollOffset = calculateMean(rollList?.toMutableList())
     }
 }

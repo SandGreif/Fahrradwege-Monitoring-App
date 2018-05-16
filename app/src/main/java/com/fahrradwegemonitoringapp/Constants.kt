@@ -25,8 +25,4 @@ package com.fahrradwegemonitoringapp
  */
 const val REQUEST_MULTIPLE_PERMISSIONS = 1
 
-/**
- * max Zeitfenster in Nanosekunden
- */
-const val  MAX_TIMEFRAME = 500000000
 
