@@ -46,6 +46,7 @@ class MotionPositionSensorData : SensorEventListener  {
      * Listen zum zwischenspeichern der Beschleunigungssensordaten y,z
      */
     private var zAxisList: MutableList<Float>? = null
+    private var yAxisList: MutableList<Float>? = null
 
     private var pitchList: MutableList<Float>? = null
 
@@ -56,22 +57,17 @@ class MotionPositionSensorData : SensorEventListener  {
 
     /**
      *  In diesen Variablen stehen die Kallibrierungsoffsets für
-     *  Roll und Nick Winkel sowie die Beschleunigungssensorachsen X,Y,Z
+     *  Roll und Nick Winkel sowie die Beschleunigungssensorachsen Y,Z
      */
     private var pitchOffset: Float = 0.0f
     private var zOffset: Float = 0.0f
+    private var yOffset: Float = 0.0f
 
     // Current data from accelerometer & magnetometer.  The arrays hold values
     // for X, Y, and Z.
     private var mAccelerometerData = FloatArray(3)
     private var mMagnetometerData = FloatArray(3)
-
-    /**
-     * Alpha Wert fuer Tiefpassfilter um Gravity Wete aus den Beschleunigungssensordaten
-     * zu entfernen
-     */
-    private  val alpha: Float = 0.8f
-    private var gravity = FloatArray(3)
+    private var linearAccelerometerData = FloatArray(3)
 
     /**
      * Boolean Variable die angibt ob Daten Samples gesammelt werden sollen.
@@ -84,6 +80,7 @@ class MotionPositionSensorData : SensorEventListener  {
 
     private var mSensorManager: SensorManager? = null
     private var mAccelerometer: Sensor? = null
+    private var linearAccelerometer: Sensor? = null
     private var mMagneticField: Sensor? = null
     private var activity: Activity? = null
 
@@ -104,7 +101,7 @@ class MotionPositionSensorData : SensorEventListener  {
      */
     fun init(activity: Activity, location: GPSLocation) {
         // Datenwerte sollen aufgerunded werden auf 5 Kommastellen
-        var samplingPeriodMicroS = 8000
+        val samplingPeriodMicroS = 8000
         df.roundingMode = RoundingMode.CEILING
         this.activity = activity
         this.location = location
@@ -114,6 +111,9 @@ class MotionPositionSensorData : SensorEventListener  {
         mSensorManager?.registerListener(this, mAccelerometer, samplingPeriodMicroS)
         mMagneticField = mSensorManager?.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
         mSensorManager?.registerListener(this, mMagneticField, samplingPeriodMicroS)
+        linearAccelerometer = mSensorManager?.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
+        mSensorManager?.registerListener(this, linearAccelerometer, samplingPeriodMicroS)
+        yAxisList = mutableListOf()
         zAxisList = mutableListOf()
         pitchList = mutableListOf()
         timestampsNsList = mutableListOf()
@@ -164,9 +164,10 @@ class MotionPositionSensorData : SensorEventListener  {
         val sensorType = event?.sensor?.type
         when (sensorType) {
             Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
+            Sensor.TYPE_LINEAR_ACCELERATION -> linearAccelerometerData = event.values.clone()
             Sensor.TYPE_MAGNETIC_FIELD -> mMagnetometerData = event.values.clone()
         }
-        if (sensorType == Sensor.TYPE_ACCELEROMETER) {
+        if (sensorType == Sensor.TYPE_LINEAR_ACCELERATION) {
             // Berechnet die Rotationsmatrix. Dabei werden die Beschleunigungssensordaten und
             // Magnetsensordaten genutzt, um die Smartphone spezifischen Koordinaten auf die Welt Koordinaten
             // zu transformieren
@@ -178,11 +179,6 @@ class MotionPositionSensorData : SensorEventListener  {
             if (rotationOK) {
                 SensorManager.getOrientation(rotationMatrix, orientationValues)
             }
-            // Anwendung eines einfachen Tiefpassfilters, um den Gravitationsanteil
-            // aus den Beschleunigungssensordaten zu entfernen
-            gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0]
-            gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
-            gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
             if (isDataGatheringActive) {
                 var azimuth: Float = orientationValues[0]
                 val geoField: GeomagneticField
@@ -197,7 +193,8 @@ class MotionPositionSensorData : SensorEventListener  {
                     azimuth += geoField.declination // Berechnet den magnetischen Norden zu den geografischen Norden
                 }
                 pitchList?.add(orientationValues[1] - pitchOffset)
-                zAxisList?.add(event.values[2] - gravity[2] - zOffset)
+                yAxisList?.add(event.values[1] - yOffset)
+                zAxisList?.add(event.values[2] - zOffset)
                 timestampsNsList?.add(timestampNs)
                 stopTimestampMs = timestampMs
             }
@@ -219,11 +216,13 @@ class MotionPositionSensorData : SensorEventListener  {
             // Über die Exemplarvariablen Listen kann nicht iterriert werden, weil in einem Thread
             // über den Listener parall auf diese zugegriffen wird. Deshalb werden die Listen kopiert
             val timestampsFinish = timestampsNsList?.toMutableList()?.subList(indecis[0], indecis[1])
+            val yListFinish = yAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
             val zListFinish = zAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
             val pitchListFinish = pitchList?.toMutableList()?.subList(indecis[0], indecis[1])
             val startTimeframe = startExposureTime - calcOffsetExposure(exposureTime, dynamicTimeframe)
-            return "%s,%s,%s,%s,%s".format(
+            return "%s,%s,%s,%s,%s,%s".format(
                     calcStringList(zListFinish),
+                    calcStringList(yListFinish),
                     calcStringList(pitchListFinish),
                     calcTimeStringList(timestampsFinish,exposureTime,startExposureTime,dynamicTimeframe),
                     "${zListFinish?.size}",
@@ -256,10 +255,10 @@ class MotionPositionSensorData : SensorEventListener  {
         var result = ""
         if(list?.isEmpty()!!)
             return result
-        val startTimeNs = list?.first()
+        val startTimeNs = list.first()
         val offsetExposure = calcOffsetExposure(exposureTime, dynamicTimeframe)
         val startTimeframe = startExposureTime - offsetExposure
-        val diffStart = startTimeNs!! - startTimeframe
+        val diffStart = startTimeNs - startTimeframe
         list.forEach {
             result += "${it-startTimeNs+diffStart} "
         }
@@ -290,7 +289,7 @@ class MotionPositionSensorData : SensorEventListener  {
         var listTime = list?.toMutableList()
         var startFound = false
         var worstCaseFound = false
-        listTime = listTime?.subList(offsetIndexList,listTime?.size -1)
+        listTime = listTime?.subList(offsetIndexList,listTime.size -1)
         val offsetExposure = calcOffsetExposure(exposureTime, dynamicTimeframe) // Berechnet Offset-Zeit
         val offsetExposureWorstCase = worstCaseTimeframe/2
         val startTimeframeWorstCast = startExposureTime - offsetExposureWorstCase
@@ -356,6 +355,7 @@ class MotionPositionSensorData : SensorEventListener  {
         offsetIndexList = 0
         timestampsNsList?.clear()
         stopTimestampMs = 0
+        yAxisList?.clear()
         zAxisList?.clear()
         pitchList?.clear()
     }
@@ -417,6 +417,7 @@ class MotionPositionSensorData : SensorEventListener  {
      */
     fun stopCalibration() {
         isDataGatheringActive = false
+        yOffset = calculateMean(zAxisList?.toMutableList())
         zOffset = calculateMean(zAxisList?.toMutableList())
         pitchOffset = calculateMean(pitchList?.toMutableList())
     }

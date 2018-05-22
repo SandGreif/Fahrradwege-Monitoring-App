@@ -371,7 +371,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         if (image != null) {
             if (location != null) {
                 speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
-              // if ((((speed - 5.0f) > 0.0001)) && ((speed - 25.0f) < 0.0001)) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
+               if ((((speed - 5.0f) > 0.0001)) && ((speed - 25.0f) < 0.0001)) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
                 // Berechnung des dynamischen Zeitfensters
                 if(location?.hasSpeed()!! && location?.speed!! > 0) {
                     actualSpeed = location?.speed!!
@@ -402,11 +402,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     image.close()
                 }
              } else {
-             image?.close()
+             image.close()
            }
-     //   } else {
-      //      image?.close()
-     //   }
+        } else {
+            image?.close()
+        }
         requestNextImage()
     }
 
@@ -498,8 +498,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("merkmaleRoh.csv"))
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
-                "Zeitstempel in Unixzeit","Breitengrad","Laengengrad","Geschwindigkeit in km/h","Z-Achse Beschleunigungswerte in m/s^2",
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+                "Zeitstempel in Unixzeit","Breitengrad","Laengengrad","Geschwindigkeit in km/h","Z-Achse Beschleunigungswerte in m/s^2","Y-Achse Beschleunigungswerte in m/s^2",
                 "Nick Messwerte in rad","Zeitstempel der Messwerte in ns","Anzahl der Messwerte","Start des Zeitfensters in ns seit Start der JVM",
                 "Start der Messwerterfassung in ns seit Start der JVM","Start der Belichtung in ns seit Start der JVM","Belichtungszeit in ns",
                 "Letzter Zeitstempel der Messwerterfassung in ns seit Start der JVM","Stopp der Messwerterfassung in Unixzeit","Speicherzeitpunkt der Merkmale in Unixzeit"))
