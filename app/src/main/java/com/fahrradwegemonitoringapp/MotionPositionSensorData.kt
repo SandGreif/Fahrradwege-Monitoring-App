@@ -28,6 +28,11 @@ class MotionPositionSensorData : SensorEventListener  {
     private lateinit var magnetTxt : TextView
 
     /**
+     * Offset Index um schnellen Zugriff auf die Messwerte zu ermöglichen
+     * Dies ist eine Optimierung
+     */
+    private var offsetIndexList: Int = 0
+    /**
      * Klasse um die aktuelle Zeit und Datum zu erhalten
      */
     private lateinit var time: Time
@@ -38,7 +43,7 @@ class MotionPositionSensorData : SensorEventListener  {
     private var stopTimestampMs : Long = 0
 
     /**
-     * Listen zum zwischenspeichern der Beschleunigungssensordaten x,y,z
+     * Listen zum zwischenspeichern der Beschleunigungssensordaten y,z
      */
     private var zAxisList: MutableList<Float>? = null
 
@@ -208,21 +213,21 @@ class MotionPositionSensorData : SensorEventListener  {
     *  Prec.:
      * Postc.: Gibt berechnete Daten als String zurück, wenn isDataGatheringActive ist true ansonsten null
     */
-    fun getData( startExposureTime : Long, exposureTime : Long, dynamicTimeframe : Long) : String? {
-        if(!isDataGatheringActive && exposureTime <= dynamicTimeframe) {
+    fun getData(startExposureTime : Long, exposureTime : Long, dynamicTimeframe : Long) : String? {
+        if(exposureTime <= dynamicTimeframe) {
             val indecis = getTimeframeIndecis(timestampsNsList,startExposureTime,exposureTime, dynamicTimeframe)
             // Über die Exemplarvariablen Listen kann nicht iterriert werden, weil in einem Thread
-            // über den Listener paralle auf diese zugegriffen wird. Deshalb werden die Listen kopiert
+            // über den Listener parall auf diese zugegriffen wird. Deshalb werden die Listen kopiert
             val timestampsFinish = timestampsNsList?.toMutableList()?.subList(indecis[0], indecis[1])
             val zListFinish = zAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
             val pitchListFinish = pitchList?.toMutableList()?.subList(indecis[0], indecis[1])
-            val startExposureTimeOffset = startExposureTime - calcOffsetExposure(exposureTime, dynamicTimeframe)
+            val startTimeframe = startExposureTime - calcOffsetExposure(exposureTime, dynamicTimeframe)
             return "%s,%s,%s,%s,%s".format(
                     calcStringList(zListFinish),
                     calcStringList(pitchListFinish),
                     calcTimeStringList(timestampsFinish,exposureTime,startExposureTime,dynamicTimeframe),
                     "${zListFinish?.size}",
-                    "$startExposureTimeOffset")
+                    "$startTimeframe")
         }
         return null
     }
@@ -249,10 +254,12 @@ class MotionPositionSensorData : SensorEventListener  {
      */
     private fun calcTimeStringList(list : MutableList<Long>?, exposureTime : Long, startExposureTime : Long, dynamicTimeframe : Long) : String {
         var result = ""
+        if(list?.isEmpty()!!)
+            return result
         val startTimeNs = list?.first()
         val offsetExposure = calcOffsetExposure(exposureTime, dynamicTimeframe)
-        val startExposureTimeOffset = startExposureTime - offsetExposure
-        val diffStart = startTimeNs!! - startExposureTimeOffset
+        val startTimeframe = startExposureTime - offsetExposure
+        val diffStart = startTimeNs!! - startTimeframe
         list.forEach {
             result += "${it-startTimeNs+diffStart} "
         }
@@ -260,7 +267,7 @@ class MotionPositionSensorData : SensorEventListener  {
     }
 
     /**
-     * Berechnet den Offset von der Different des Zeitfensers zu der Belichtungszeit
+     * Berechnet den Offset von der Differenz des Zeitfensters zu der Belichtungszeit
      * Prec. exposureTime > 0
      * Postc. berechneter Offset
      */
@@ -278,22 +285,35 @@ class MotionPositionSensorData : SensorEventListener  {
     fun getTimeframeIndecis( list : MutableList<Long>?, startExposureTime : Long, exposureTime : Long, dynamicTimeframe : Long) : IntArray {
         val indecis = IntArray(2)
         var i = 0
+        var iWorstCase = 0
+        val worstCaseTimeframe : Long = 720000000
+        var listTime = list?.toMutableList()
         var startFound = false
-        val offsetExposure = calcOffsetExposure(exposureTime, dynamicTimeframe ) // Berechnet Offset-Zeit
-        val timestampFinish = list?.toMutableList()
-        val startExposureTimeOffset = startExposureTime - offsetExposure
-        val stopExposureTimeOffset = startExposureTime + exposureTime + offsetExposure
-        timestampFinish?.forEach {
-            if (!startFound && it >= startExposureTimeOffset) {
+        var worstCaseFound = false
+        listTime = listTime?.subList(offsetIndexList,listTime?.size -1)
+        val offsetExposure = calcOffsetExposure(exposureTime, dynamicTimeframe) // Berechnet Offset-Zeit
+        val offsetExposureWorstCase = worstCaseTimeframe/2
+        val startTimeframeWorstCast = startExposureTime - offsetExposureWorstCase
+        val startTimeframe = startExposureTime - offsetExposure
+        val stopTimeframe = startExposureTime + exposureTime + offsetExposure
+        listTime?.forEach {
+            if (!worstCaseFound && it >= startTimeframeWorstCast) {
+                worstCaseFound = true
+                iWorstCase = i
+            }
+            if (!startFound && it >= startTimeframe) {
                 indecis[0] = i
                 startFound = true
-            } else if (startFound && it <= stopExposureTimeOffset) {
+            } else if (startFound && it <= stopTimeframe) {
                 indecis[1] = i
             } else if(startFound){
                 return@forEach
             }
             i++
         }
+        indecis[0] = indecis[0] + offsetIndexList
+        indecis[1] = indecis[1] + offsetIndexList
+        offsetIndexList = iWorstCase + offsetIndexList
         return indecis
     }
 
@@ -333,6 +353,7 @@ class MotionPositionSensorData : SensorEventListener  {
      * Postc.: Die angegebenen Listen haben keine Elemente mehr
      */
     fun clearData() {
+        offsetIndexList = 0
         timestampsNsList?.clear()
         stopTimestampMs = 0
         zAxisList?.clear()

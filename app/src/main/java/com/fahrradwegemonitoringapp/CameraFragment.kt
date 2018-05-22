@@ -277,11 +277,14 @@ class CameraFragment : Fragment(), View.OnClickListener,
         }
 
         private fun capturePicture(result: CaptureResult) {
-            motionPositionSensorData?.startDataCollection()
-            try {
-                Thread.sleep(360)
-            } catch (e: IllegalArgumentException) {
-                Logger.writeToLogger(Exception().stackTrace[0],e.toString())
+            if(imageCounter % 100 == 0) {
+                motionPositionSensorData?.clearData() // Vor der Aufnahme werden die letzten erfassten Sensordaten(Beschl./Gier-Roll-Nick) entfernt
+                motionPositionSensorData?.startDataCollection()
+                try {
+                    Thread.sleep(360)
+                } catch (e: IllegalArgumentException) {
+                    Logger.writeToLogger(Exception().stackTrace[0], e.toString())
+                }
             }
             val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
             if (aeState == null || aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
@@ -367,21 +370,24 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val actualSpeed: Float?
         if (image != null) {
             if (location != null) {
+                speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
+              // if ((((speed - 5.0f) > 0.0001)) && ((speed - 25.0f) < 0.0001)) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
+                // Berechnung des dynamischen Zeitfensters
                 if(location?.hasSpeed()!! && location?.speed!! > 0) {
                     actualSpeed = location?.speed!!
-                    dynamicTimeframe = ((1 / actualSpeed) * 1000000000).toLong()
+                    dynamicTimeframe = (1 / actualSpeed).toLong() * 1000000000
                 } else {
                     dynamicTimeframe = 720000000
                 }
+                if(dynamicTimeframe > 720000000){
+                    dynamicTimeframe = 720000000
+                }
                 if(stopDataCapturing()) {
-                    speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
-                    if ((((speed - 5.0f) > 0.0001)) && ((speed - 25.0f) < 0.0001)) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
-                        // Berechnung des dynamischen Zeitfensters
                         if (imageCounter % (2000 * directoriesCounter) == 0) {
                             newFolder()
                         }
-                        saveFeatures(timeMs)
                         saveImage(image, timeMs)
+                        saveFeatures(timeMs)
                         activity.runOnUiThread({
                             run {
                                 imageCounterTxt.text = "%d %s".format(imageCounter, "Bilder")
@@ -389,18 +395,18 @@ class CameraFragment : Fragment(), View.OnClickListener,
                             }
                         })
                     } else {
+                        Logger.writeToLogger(Exception().stackTrace[0],"Belichtungszeit war 0 ns")
                         image.close()
                     }
                 } else {
-                    Logger.writeToLogger(Exception().stackTrace[0],"Belichtungszeit war 0 ns")
                     image.close()
                 }
-              } else {
-                image.close()
+             } else {
+             image?.close()
            }
-        } else {
-            image?.close()
-        }
+     //   } else {
+      //      image?.close()
+     //   }
         requestNextImage()
     }
 
@@ -414,15 +420,14 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun stopDataCapturing() : Boolean {
         var exposerTimeGreaterZero = false
         // Die verstrichene Zeit muss mindestens der MAX_EXPOSURE_TIME entsprechen
-        if((System.nanoTime() - exposureTimeStart + exposureTime) < dynamicTimeframe) {
+        if((System.nanoTime() - exposureTimeStart + exposureTime) < dynamicTimeframe/2) {
             // Ausreichend Zeit für die Bewegungssensordatenerfassung gewährleisten
             try {
-                Thread.sleep((dynamicTimeframe -((System.nanoTime() - exposureTimeStart) + exposureTime))/1000000)
+                Thread.sleep((dynamicTimeframe/2 -((System.nanoTime() - exposureTimeStart) + exposureTime))/1000000)
             } catch (e: IllegalArgumentException) {
                 Logger.writeToLogger(Exception().stackTrace[0],e.toString())
             }
         }
-        motionPositionSensorData?.stopDataCollection()
         if(exposureTime > 0) {
             exposerTimeGreaterZero =  true
         }
@@ -449,10 +454,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val latitude = location?.latitude?.toFloat()
         val longitude = location?.longitude?.toFloat()
         val motionDataString = motionPositionSensorData?.getData(exposureTimeStart,exposureTime,dynamicTimeframe)
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "$timestamp","$latitude","$longitude","$speed","$motionDataString",
                 "${motionPositionSensorData?.getFirstTimestamp()}",
-                "$exposureTimeStart","$exposureTime","${motionPositionSensorData?.getLastTimestamp()}","${motionPositionSensorData?.getStopTimestampMs()}"))
+                "$exposureTimeStart","$exposureTime","${motionPositionSensorData?.getLastTimestamp()}","${motionPositionSensorData?.getStopTimestampMs()}",
+                "${time.getTime()}"))
         Logger.writeToLogger(Exception().stackTrace[0],"saveFeatures")
     }
 
@@ -492,11 +498,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("merkmaleRoh.csv"))
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "Zeitstempel in Unixzeit","Breitengrad","Laengengrad","Geschwindigkeit in km/h","Z-Achse Beschleunigungswerte in m/s^2",
                 "Nick Messwerte in rad","Zeitstempel der Messwerte in ns","Anzahl der Messwerte","Start des Zeitfensters in ns seit Start der JVM",
                 "Start der Messwerterfassung in ns seit Start der JVM","Start der Belichtung in ns seit Start der JVM","Belichtungszeit in ns",
-                "Letzter Zeitstempel der Messwerterfassung in ns seit Start der JVM","Stopp der Messwerterfassung in Unixzeit"))
+                "Letzter Zeitstempel der Messwerterfassung in ns seit Start der JVM","Stopp der Messwerterfassung in Unixzeit","Speicherzeitpunkt der Merkmale in Unixzeit"))
     }
 
     override fun onCreateView(inflater: LayoutInflater,
@@ -853,7 +859,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 Logger.writeToLogger(Exception().stackTrace[0],"activity oder cameraDevice gleich null")
                 return
             }
-            motionPositionSensorData?.clearData() // Vor der Aufnahme werden die letzten erfassten Sensordaten(Beschl./Gier-Roll-Nick) entfernt
             var frameNumberStart : Long = 0
             val rotation = activity.windowManager.defaultDisplay.rotation
 
