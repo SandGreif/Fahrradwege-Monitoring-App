@@ -375,7 +375,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 // Berechnung des dynamischen Zeitfensters
                 if(location?.hasSpeed()!! && location?.speed!! > 0) {
                     actualSpeed = location?.speed!!
-                    dynamicTimeframe = (1 / actualSpeed).toLong() * 1000000000
+                    dynamicTimeframe = ((1 / actualSpeed) * 1000000000).toLong()
                 } else {
                     dynamicTimeframe = 720000000
                 }
@@ -402,11 +402,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     image.close()
                 }
              } else {
-             image.close()
+            image.close()
            }
         } else {
             image?.close()
-        }
+      }
         requestNextImage()
     }
 
