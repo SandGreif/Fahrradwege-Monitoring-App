@@ -371,16 +371,16 @@ class CameraFragment : Fragment(), View.OnClickListener,
         if (image != null) {
             if (location != null) {
                 speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
-               if ((((speed - 5.0f) > 0.0001)) && ((speed - 25.0f) < 0.0001)) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
+               if ((speed - 5.0f) > 0.0001) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
                 // Berechnung des dynamischen Zeitfensters
                 if(location?.hasSpeed()!! && location?.speed!! > 0) {
                     actualSpeed = location?.speed!!
-                    dynamicTimeframe = ((1 / actualSpeed) * 1000000000).toLong()
+                    dynamicTimeframe = (((1 / actualSpeed) * 0.7112) * 1000000000).toLong()
                 } else {
-                    dynamicTimeframe = 720000000
+                    dynamicTimeframe = WORSTCASETIMEFRAME
                 }
-                if(dynamicTimeframe > 720000000){
-                    dynamicTimeframe = 720000000
+                if(dynamicTimeframe > WORSTCASETIMEFRAME){
+                    dynamicTimeframe = WORSTCASETIMEFRAME
                 }
                 if(stopDataCapturing()) {
                         if (imageCounter % (2000 * directoriesCounter) == 0) {
@@ -454,10 +454,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val latitude = location?.latitude?.toFloat()
         val longitude = location?.longitude?.toFloat()
         val motionDataString = motionPositionSensorData?.getData(exposureTimeStart,exposureTime,dynamicTimeframe)
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "$timestamp","$latitude","$longitude","$speed","$motionDataString",
                 "${motionPositionSensorData?.getFirstTimestamp()}",
-                "$exposureTimeStart","$exposureTime","${motionPositionSensorData?.getLastTimestamp()}","${motionPositionSensorData?.getStopTimestampMs()}",
+                "$exposureTimeStart","$exposureTime","${motionPositionSensorData?.getLastTimestamp()}",
                 "${time.getTime()}"))
         Logger.writeToLogger(Exception().stackTrace[0],"saveFeatures")
     }
@@ -498,11 +498,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("merkmaleRoh.csv"))
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "Zeitstempel in Unixzeit","Breitengrad","Laengengrad","Geschwindigkeit in km/h","Z-Achse Beschleunigungswerte in m/s^2","Y-Achse Beschleunigungswerte in m/s^2",
                 "Nick Messwerte in rad","Zeitstempel der Messwerte in ns","Anzahl der Messwerte","Start des Zeitfensters in ns seit Start der JVM",
                 "Start der Messwerterfassung in ns seit Start der JVM","Start der Belichtung in ns seit Start der JVM","Belichtungszeit in ns",
-                "Letzter Zeitstempel der Messwerterfassung in ns seit Start der JVM","Stopp der Messwerterfassung in Unixzeit","Speicherzeitpunkt der Merkmale in Unixzeit"))
+                "Letzter Zeitstempel der Messwerterfassung in ns seit Start der JVM","Speicherzeitpunkt der Merkmale in Unixzeit"))
     }
 
     override fun onCreateView(inflater: LayoutInflater,
@@ -551,6 +551,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     override fun onResume() {
+        Logger.writeToLogger(Exception().stackTrace[0],"")
         super.onResume()
         startBackgroundThread()
         if (textureView.isAvailable) {
@@ -563,6 +564,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
     override fun onPause() {
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
             Logger.writeToLogger(Exception().stackTrace[0],"")
+        closeCamera()
+        stopBackgroundThread()
         super.onPause()
     }
 

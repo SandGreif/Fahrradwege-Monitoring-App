@@ -38,9 +38,9 @@ class MotionPositionSensorData : SensorEventListener  {
     private lateinit var time: Time
 
     /**
-     * Aktuelste Event Zeitstempel in Unixzeit
+     * letzte Zeitstempel des Sublist
      */
-    private var stopTimestampMs : Long = 0
+    private var lastTimeStamp : Long = 0
 
     /**
      * Listen zum zwischenspeichern der Beschleunigungssensordaten y,z
@@ -101,7 +101,7 @@ class MotionPositionSensorData : SensorEventListener  {
      */
     fun init(activity: Activity, location: GPSLocation) {
         // Datenwerte sollen aufgerunded werden auf 5 Kommastellen
-        val samplingPeriodMicroS = 8000
+        val samplingPeriodMicroS = 6000
         df.roundingMode = RoundingMode.CEILING
         this.activity = activity
         this.location = location
@@ -196,7 +196,6 @@ class MotionPositionSensorData : SensorEventListener  {
                 yAxisList?.add(event.values[1] - yOffset)
                 zAxisList?.add(event.values[2] - zOffset)
                 timestampsNsList?.add(timestampNs)
-                stopTimestampMs = timestampMs
             }
         }
     }
@@ -287,17 +286,17 @@ class MotionPositionSensorData : SensorEventListener  {
         val indecis = IntArray(2)
         var i = 0
         var iWorstCase = 0
-        val worstCaseTimeframe : Long = 720000000
         var listTime = list?.toMutableList()
         var startFound = false
         var worstCaseFound = false
-        listTime = listTime?.subList(offsetIndexList,listTime.size -1)
+        lastTimeStamp = listTime?.last()!!
+        listTime = listTime.subList(offsetIndexList,listTime.size -1)
         val offsetExposure = calcOffsetExposure(exposureTime, dynamicTimeframe) // Berechnet Offset-Zeit
-        val offsetExposureWorstCase = worstCaseTimeframe/2
+        val offsetExposureWorstCase = WORSTCASETIMEFRAME/2
         val startTimeframeWorstCast = startExposureTime - offsetExposureWorstCase
         val startTimeframe = startExposureTime - offsetExposure
         val stopTimeframe = startExposureTime + exposureTime + offsetExposure
-        listTime?.forEach {
+        listTime.forEach {
             if (!worstCaseFound && it >= startTimeframeWorstCast) {
                 worstCaseFound = true
                 iWorstCase = i
@@ -356,7 +355,7 @@ class MotionPositionSensorData : SensorEventListener  {
     fun clearData() {
         offsetIndexList = 0
         timestampsNsList?.clear()
-        stopTimestampMs = 0
+        lastTimeStamp = 0
         yAxisList?.clear()
         zAxisList?.clear()
         pitchList?.clear()
@@ -370,15 +369,9 @@ class MotionPositionSensorData : SensorEventListener  {
     }
 
     fun getLastTimestamp() : Long? {
-        var result : Long? = -1
-        if(timestampsNsList?.isNotEmpty()!!)
-            result = timestampsNsList?.last()
-        return result
+        return lastTimeStamp
     }
 
-    fun getStopTimestampMs() : Long {
-        return stopTimestampMs
-    }
     /**
      * Berechnet den  Mittelwert über die Float Elemente einer Liste.
      * Prec.:
