@@ -38,9 +38,14 @@ class MotionPositionSensorData : SensorEventListener  {
     private lateinit var time: Time
 
     /**
-     * letzte Zeitstempel des Sublist
+     * letzte Zeitstempel der Sublist
      */
     private var lastTimeStamp : Long = 0
+
+    /**
+     * Erste Zeitstempel der Sublist
+     */
+    private var firstTimeStamp : Long = 0
 
     /**
      * Listen zum zwischenspeichern der Beschleunigungssensordaten y,z
@@ -101,7 +106,7 @@ class MotionPositionSensorData : SensorEventListener  {
      */
     fun init(activity: Activity, location: GPSLocation) {
         // Datenwerte sollen aufgerunded werden auf 5 Kommastellen
-        val samplingPeriodMicroS = 6000
+        val samplingPeriodMicroS = 8000
         df.roundingMode = RoundingMode.CEILING
         this.activity = activity
         this.location = location
@@ -291,6 +296,7 @@ class MotionPositionSensorData : SensorEventListener  {
         var worstCaseFound = false
         lastTimeStamp = listTime?.last()!!
         listTime = listTime.subList(offsetIndexList,listTime.size -1)
+        firstTimeStamp  = listTime.first()
         val offsetExposure = calcOffsetExposure(exposureTime, dynamicTimeframe) // Berechnet Offset-Zeit
         val offsetExposureWorstCase = WORSTCASETIMEFRAME/2
         val startTimeframeWorstCast = startExposureTime - offsetExposureWorstCase
@@ -361,11 +367,11 @@ class MotionPositionSensorData : SensorEventListener  {
         pitchList?.clear()
     }
 
-    fun getFirstTimestamp() : Long? {
-        var result : Long? = -1
-        if(timestampsNsList?.isNotEmpty()!!)
-            result = timestampsNsList?.first()
-        return result
+    /**
+     * Gibt den ersten Zeitstempel der Subliste in ns seit Start der Java VM zurück
+     */
+    fun getFirstTimestampSubList() : Long? {
+        return firstTimeStamp
     }
 
     fun getLastTimestamp() : Long? {

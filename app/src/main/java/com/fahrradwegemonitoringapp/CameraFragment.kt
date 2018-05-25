@@ -375,7 +375,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 // Berechnung des dynamischen Zeitfensters
                 if(location?.hasSpeed()!! && location?.speed!! > 0) {
                     actualSpeed = location?.speed!!
-                    dynamicTimeframe = (((1 / actualSpeed) * 0.7112) * 1000000000).toLong()
+                    dynamicTimeframe = ((1 / actualSpeed) * 1000000000).toLong()
                 } else {
                     dynamicTimeframe = WORSTCASETIMEFRAME
                 }
@@ -420,10 +420,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun stopDataCapturing() : Boolean {
         var exposerTimeGreaterZero = false
         // Die verstrichene Zeit muss mindestens der MAX_EXPOSURE_TIME entsprechen
-        if((System.nanoTime() - exposureTimeStart + exposureTime) < dynamicTimeframe/2) {
+        if((System.nanoTime() - exposureTimeStart + exposureTime) < (dynamicTimeframe/2)) {
             // Ausreichend Zeit für die Bewegungssensordatenerfassung gewährleisten
             try {
-                Thread.sleep((dynamicTimeframe/2 -((System.nanoTime() - exposureTimeStart) + exposureTime))/1000000)
+                Thread.sleep(((dynamicTimeframe/2) -((System.nanoTime() - exposureTimeStart) + exposureTime))/1000000)
             } catch (e: IllegalArgumentException) {
                 Logger.writeToLogger(Exception().stackTrace[0],e.toString())
             }
@@ -456,7 +456,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val motionDataString = motionPositionSensorData?.getData(exposureTimeStart,exposureTime,dynamicTimeframe)
         fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "$timestamp","$latitude","$longitude","$speed","$motionDataString",
-                "${motionPositionSensorData?.getFirstTimestamp()}",
+                "${motionPositionSensorData?.getFirstTimestampSubList()}",
                 "$exposureTimeStart","$exposureTime","${motionPositionSensorData?.getLastTimestamp()}",
                 "${time.getTime()}"))
         Logger.writeToLogger(Exception().stackTrace[0],"saveFeatures")
@@ -501,7 +501,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "Zeitstempel in Unixzeit","Breitengrad","Laengengrad","Geschwindigkeit in km/h","Z-Achse Beschleunigungswerte in m/s^2","Y-Achse Beschleunigungswerte in m/s^2",
                 "Nick Messwerte in rad","Zeitstempel der Messwerte in ns","Anzahl der Messwerte","Start des Zeitfensters in ns seit Start der JVM",
-                "Start der Messwerterfassung in ns seit Start der JVM","Start der Belichtung in ns seit Start der JVM","Belichtungszeit in ns",
+                "Erster Zeitstempel der Teilliste in ns seit Start der JVM","Start der Belichtung in ns seit Start der JVM","Belichtungszeit in ns",
                 "Letzter Zeitstempel der Messwerterfassung in ns seit Start der JVM","Speicherzeitpunkt der Merkmale in Unixzeit"))
     }
 
