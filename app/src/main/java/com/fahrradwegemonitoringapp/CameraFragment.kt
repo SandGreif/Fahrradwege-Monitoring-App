@@ -454,8 +454,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
         val latitude = location?.latitude?.toFloat()
         val longitude = location?.longitude?.toFloat()
         val motionDataString = motionPositionSensorData?.getData(exposureTimeStart,exposureTime,dynamicTimeframe)
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
-                "$timestamp","$latitude","$longitude","$speed","$motionDataString",
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+                "$timestamp","$latitude","$longitude","$speed","$motionDataString","${motionPositionSensorData?.getFirstTimestamp()}",
                 "${motionPositionSensorData?.getFirstTimestampSubList()}",
                 "$exposureTimeStart","$exposureTime","${motionPositionSensorData?.getLastTimestamp()}",
                 "${time.getTime()}"))
@@ -498,10 +498,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("merkmaleRoh.csv"))
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "Zeitstempel in Unixzeit","Breitengrad","Laengengrad","Geschwindigkeit in km/h","Z-Achse Beschleunigungswerte in m/s^2","Y-Achse Beschleunigungswerte in m/s^2",
                 "Nick Messwerte in rad","Zeitstempel der Messwerte in ns","Anzahl der Messwerte","Start des Zeitfensters in ns seit Start der JVM","Zeitstempel Messwertdaten anfordern in Unixzeit",
-                "Erster Zeitstempel der Teilliste in ns seit Start der JVM","Start der Belichtung in ns seit Start der JVM","Belichtungszeit in ns",
+                "Start der Messwerterfassung in ns seit Start der JVM","Erster Zeitstempel der Teilliste in ns seit Start der JVM","Start der Belichtung in ns seit Start der JVM","Belichtungszeit in ns",
                 "Letzter Zeitstempel der Messwerterfassung in ns seit Start der JVM","Speicherzeitpunkt der Merkmale in Unixzeit"))
     }
 

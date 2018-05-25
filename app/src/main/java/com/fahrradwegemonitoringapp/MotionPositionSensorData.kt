@@ -375,6 +375,13 @@ class MotionPositionSensorData : SensorEventListener  {
         return firstTimeStamp
     }
 
+    fun getFirstTimestamp() : Long? {
+        var result : Long? = -1
+        if(timestampsNsList?.isNotEmpty()!!)
+            result = timestampsNsList?.first()
+        return result
+    }
+
     fun getLastTimestamp() : Long? {
         return lastTimeStamp
     }
