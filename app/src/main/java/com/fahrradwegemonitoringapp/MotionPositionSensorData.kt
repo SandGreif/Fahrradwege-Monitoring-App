@@ -216,7 +216,7 @@ class MotionPositionSensorData : SensorEventListener  {
     */
     fun getData(startExposureTime : Long, exposureTime : Long, dynamicTimeframe : Long) : String? {
         if(exposureTime <= dynamicTimeframe) {
-            Logger.writeToLogger(Exception().stackTrace[0],"Zeitfenster Dauer in ns: " + dynamicTimeframe)
+            val timestampGetDataMs = time.getTime()
             val indecis = getTimeframeIndecis(timestampsNsList,startExposureTime,exposureTime, dynamicTimeframe)
             // Über die Exemplarvariablen Listen kann nicht iterriert werden, weil in einem Thread
             // über den Listener parall auf diese zugegriffen wird. Deshalb werden die Listen kopiert
@@ -225,13 +225,14 @@ class MotionPositionSensorData : SensorEventListener  {
             val zListFinish = zAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
             val pitchListFinish = pitchList?.toMutableList()?.subList(indecis[0], indecis[1])
             val startTimeframe = startExposureTime - calcOffsetExposure(exposureTime, dynamicTimeframe)
-            return "%s,%s,%s,%s,%s,%s".format(
+            return "%s,%s,%s,%s,%s,%s,%s".format(
                     calcStringList(zListFinish),
                     calcStringList(yListFinish),
                     calcStringList(pitchListFinish),
                     calcTimeStringList(timestampsFinish,exposureTime,startExposureTime,dynamicTimeframe),
                     "${zListFinish?.size}",
-                    "$startTimeframe")
+                    "$startTimeframe",
+                    "$timestampGetDataMs")
         }
         Logger.writeToLogger(Exception().stackTrace[0],"Zeitfenster Dauer in ns: " + dynamicTimeframe)
         return null
