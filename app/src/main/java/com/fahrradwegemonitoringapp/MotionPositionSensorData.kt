@@ -3,6 +3,7 @@ package com.fahrradwegemonitoringapp
 import android.app.Activity
 import android.content.Context
 import android.hardware.*
+import android.os.SystemClock
 import android.widget.TextView
 import android.widget.Toast
 import java.math.RoundingMode
@@ -59,6 +60,8 @@ class MotionPositionSensorData : SensorEventListener  {
      * Zeitstempel innerhalb eines Zeitfensters in Nanosekunden seit Start der Java Vm,
      */
     private var timestampsNsList: MutableList<Long>? = null
+
+    private var timestampsGap: MutableList<Long>? = null
 
     /**
      *  In diesen Variablen stehen die Kallibrierungsoffsets für
@@ -121,6 +124,7 @@ class MotionPositionSensorData : SensorEventListener  {
         yAxisList = mutableListOf()
         zAxisList = mutableListOf()
         pitchList = mutableListOf()
+        timestampsGap = mutableListOf()
         timestampsNsList = mutableListOf()
         magnetTxt = activity.findViewById(R.id.magnetTxt) as TextView
     }
@@ -164,9 +168,9 @@ class MotionPositionSensorData : SensorEventListener  {
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
-        val timestampNs = time.getTimeNanoSec()
-        val timestampMs = time.getTime()
-        val sensorType = event?.sensor?.type
+        val timeGap = SystemClock.elapsedRealtimeNanos() -  event?.timestamp!! // Berechnet Zeitdifferenz in ns zwischen Event Zeitstempel und vergangener Zeit
+        val timestampNs = time.getTimeNanoSec() - timeGap
+        val sensorType = event.sensor?.type
         when (sensorType) {
             Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
             Sensor.TYPE_LINEAR_ACCELERATION -> linearAccelerometerData = event.values.clone()
@@ -201,6 +205,7 @@ class MotionPositionSensorData : SensorEventListener  {
                 yAxisList?.add(event.values[1] - yOffset)
                 zAxisList?.add(event.values[2] - zOffset)
                 timestampsNsList?.add(timestampNs)
+                timestampsGap?.add(timeGap)
             }
         }
     }
@@ -224,12 +229,14 @@ class MotionPositionSensorData : SensorEventListener  {
             val yListFinish = yAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
             val zListFinish = zAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
             val pitchListFinish = pitchList?.toMutableList()?.subList(indecis[0], indecis[1])
+            val timestampsGapFinish = timestampsGap?.toMutableList()?.subList(indecis[0], indecis[1])
             val startTimeframe = startExposureTime - calcOffsetExposure(exposureTime, dynamicTimeframe)
-            return "%s,%s,%s,%s,%s,%s,%s".format(
+            return "%s,%s,%s,%s,%s,%s,%s,%s".format(
                     calcStringList(zListFinish),
                     calcStringList(yListFinish),
                     calcStringList(pitchListFinish),
                     calcTimeStringList(timestampsFinish,exposureTime,startExposureTime,dynamicTimeframe),
+                    calcsStringListLong(timestampsGapFinish),
                     "${zListFinish?.size}",
                     "$startTimeframe",
                     "$timestampGetDataMs")
@@ -239,8 +246,8 @@ class MotionPositionSensorData : SensorEventListener  {
     }
 
     /**
-     * Diese Funktion gibt einen String einer Float Liste zurück.
-     * Dabei soll dient dies als Vorverarbeitung, um diesen in eine CSV Datei
+     * Diese Funktion gibt einen String einer Liste des Typ Float zurück.
+     * Dabei dient dies als Vorverarbeitung, um diesen in eine CSV Datei
      * zu schreiben
      * Prec. Anzahl der Elmenete in Liste > 0
      * Postc. String wird zurück gegeben
@@ -249,6 +256,21 @@ class MotionPositionSensorData : SensorEventListener  {
         var result = ""
         list?.forEach {
             result += df.format(it).replace(",", ".") + " "
+        }
+        return result.dropLast(1)
+    }
+
+    /**
+    * Diese Funktion gibt einen String einer Liste mit Type Long zurück.
+    * Dabei dient dies als Vorverarbeitung, um diesen in eine CSV Datei
+    * zu schreiben
+    * Prec. Anzahl der Elmenete in Liste > 0
+    * Postc. String wird zurück gegeben
+    */
+    private fun calcsStringListLong(list : MutableList<Long>?) : String {
+        var result : String = ""
+        list?.forEach {
+            result += "${it} "
         }
         return result.dropLast(1)
     }

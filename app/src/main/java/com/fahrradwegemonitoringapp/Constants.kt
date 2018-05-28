@@ -28,3 +28,5 @@ const val REQUEST_MULTIPLE_PERMISSIONS = 1
 // Dauer des längsten möglichen Zeitfensters in ns
 const val WORSTCASETIMEFRAME : Long = 720000000
 
+// Die Periode der Abtastrate der Messwerterfassung 
+const val MEASUREMENTPERIODNS : Long = 8000000

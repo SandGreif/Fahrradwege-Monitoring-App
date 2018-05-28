@@ -367,21 +367,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private val onImageAvailableListener = OnImageAvailableListener {
         val timeMs = time.getTime()
         val image = it.acquireLatestImage()
-        val actualSpeed: Float?
         if (image != null) {
             if (location != null) {
                 speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
                if ((speed - 5.0f) > 0.0001) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
                 // Berechnung des dynamischen Zeitfensters
-                if(location?.hasSpeed()!! && location?.speed!! > 0) {
-                    actualSpeed = location?.speed!!
-                    dynamicTimeframe = ((1 / actualSpeed) * 1000000000).toLong()
-                } else {
-                    dynamicTimeframe = WORSTCASETIMEFRAME
-                }
-                if(dynamicTimeframe > WORSTCASETIMEFRAME){
-                    dynamicTimeframe = WORSTCASETIMEFRAME
-                }
+                   calcDynamicTimeframe()
                 if(stopDataCapturing()) {
                         if (imageCounter % (2000 * directoriesCounter) == 0) {
                             newFolder()
@@ -420,10 +411,10 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun stopDataCapturing() : Boolean {
         var exposerTimeGreaterZero = false
         // Die verstrichene Zeit muss mindestens der MAX_EXPOSURE_TIME entsprechen
-        if((System.nanoTime() - exposureTimeStart + exposureTime) < (dynamicTimeframe/2)) {
+        if((System.nanoTime() - (exposureTimeStart + exposureTime)) < ((dynamicTimeframe/2) + MEASUREMENTPERIODNS)) {
             // Ausreichend Zeit für die Bewegungssensordatenerfassung gewährleisten
             try {
-                Thread.sleep(((dynamicTimeframe/2) -((System.nanoTime() - exposureTimeStart) + exposureTime))/1000000)
+                Thread.sleep(( ((dynamicTimeframe/2)+MEASUREMENTPERIODNS) - (System.nanoTime() - (exposureTimeStart + exposureTime)))/1000000)
             } catch (e: IllegalArgumentException) {
                 Logger.writeToLogger(Exception().stackTrace[0],e.toString())
             }
@@ -486,6 +477,24 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
+     * Die Methode berechnet das dynamische Zeitfenster
+     * Prec.: (location != null) &&((speed - 5.0f) > 0.0001)
+     * Postc.: Dynamisches Zeitfenster berechnet
+     */
+    private fun calcDynamicTimeframe() {
+        val actualSpeed : Float
+        if(location?.hasSpeed()!! && location?.speed!! > 0) {
+            actualSpeed = location?.speed!!
+            dynamicTimeframe = ((1 / actualSpeed) * 1000000000).toLong()
+        } else {
+            dynamicTimeframe = WORSTCASETIMEFRAME
+        }
+        if(dynamicTimeframe > WORSTCASETIMEFRAME){
+            dynamicTimeframe = WORSTCASETIMEFRAME
+        }
+    }
+
+    /**
      * Mit dieser Methode kann ein neuer Ordner erstellt werden, um Merkmale in eine Daten
      * zu schreiben.
      * Prec.:
@@ -498,9 +507,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("merkmaleRoh.csv"))
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "Zeitstempel in Unixzeit","Breitengrad","Laengengrad","Geschwindigkeit in km/h","Z-Achse Beschleunigungswerte in m/s^2","Y-Achse Beschleunigungswerte in m/s^2",
-                "Nick Messwerte in rad","Zeitstempel der Messwerte in ns","Anzahl der Messwerte","Start des Zeitfensters in ns seit Start der JVM","Zeitstempel Messwertdaten anfordern in Unixzeit",
+                "Nick Messwerte in rad","Zeitstempel der Messwerte in ns","Sensor Events Zeitstempel Zeitdifferenz in ns seit hochfahren des Smarphone","Anzahl der Messwerte","Start des Zeitfensters in ns seit Start der JVM","Zeitstempel Messwertdaten anfordern in Unixzeit",
                 "Start der Messwerterfassung in ns seit Start der JVM","Erster Zeitstempel der Teilliste in ns seit Start der JVM","Start der Belichtung in ns seit Start der JVM","Belichtungszeit in ns",
                 "Letzter Zeitstempel der Messwerterfassung in ns seit Start der JVM","Speicherzeitpunkt der Merkmale in Unixzeit"))
     }
