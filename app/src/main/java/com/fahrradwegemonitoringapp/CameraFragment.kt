@@ -279,6 +279,15 @@ class CameraFragment : Fragment(), View.OnClickListener,
         private fun capturePicture(result: CaptureResult) {
             val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
             if (aeState == null || aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
+                if(imageCounter % 100 == 0 ) {
+                    motionPositionSensorData?.clearData() // Vor der Aufnahme werden die letzten erfassten Sensordaten(Beschl./Gier-Roll-Nick) entfernt
+                    motionPositionSensorData?.startDataCollection()
+                    try {
+                        Thread.sleep(360)
+                    } catch (e: IllegalArgumentException) {
+                        Logger.writeToLogger(Exception().stackTrace[0], e.toString())
+                    }
+                }
                 state = STATE_PICTURE_TAKEN
                 captureStillPicture()
             } else {
@@ -361,15 +370,20 @@ class CameraFragment : Fragment(), View.OnClickListener,
         if (image != null) {
             if (location != null) {
                 speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
-            //   if ((speed - 5.0f) > 0.0001) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
+               if ((speed - 5.0f) > 0.0001) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
                 // Berechnung des dynamischen Zeitfensters
                    calcDynamicTimeframe()
                 if(stopDataCapturing()) {
                         if (imageCounter % (2000 * directoriesCounter) == 0) {
                             newFolder()
                         }
-                        saveImage(image, timeMs)
-                        saveFeatures(timeMs)
+                    if(!(motionPositionSensorData?.isTimestampListEmpty()!!)) {
+                        if (saveImage(image, timeMs)) {
+                            saveFeatures(timeMs)
+                        }
+                    } else {
+                        image.close()
+                    }
                         activity.runOnUiThread({
                             run {
                                 imageCounterTxt.text = "%d %s".format(imageCounter, "Bilder")
@@ -383,9 +397,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 } else {
                     image.close()
                 }
-        //     } else {
-         //   image.close()
-          // }
+             } else {
+            image.close()
+           }
         } else {
             image?.close()
       }
@@ -402,16 +416,14 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun stopDataCapturing() : Boolean {
         var exposerTimeGreaterZero = false
         // Die verstrichene Zeit muss mindestens der MAX_EXPOSURE_TIME entsprechen
-    //    if((System.nanoTime() - (exposureTimeStart + exposureTime)+(dynamicTimeframe/2)) < ((dynamicTimeframe) + MEASUREMENTPERIODNS)) {
+        if((System.nanoTime() - (exposureTimeStart + exposureTime)) < ((dynamicTimeframe/2) + MEASUREMENTPERIODNS)) {
             // Ausreichend Zeit für die Bewegungssensordatenerfassung gewährleisten
-
-
             try {
-                Thread.sleep(40000)//( ((dynamicTimeframe*2)+MEASUREMENTPERIODNS) - (System.nanoTime() - (exposureTimeStart + exposureTime)))/1000000)
+                Thread.sleep(( ((dynamicTimeframe*2)+MEASUREMENTPERIODNS) - (System.nanoTime() - (exposureTimeStart + exposureTime)))/1000000)
             } catch (e: IllegalArgumentException) {
                 Logger.writeToLogger(Exception().stackTrace[0],e.toString())
             }
-      //  }
+        }
         if(exposureTime > 0) {
             exposerTimeGreaterZero =  true
         }
@@ -419,12 +431,17 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     /**
+     * Die Funktion speichert ein Bild ab
      * Prec.: Image != null
-     * Post.: Bild ist abgespeichert
+     * Post.: Bild ist abgespeichert. Boolean == True, wenn Bild abgespeichert wurde
      */
-    private fun saveImage(image: Image, ms: Long) {
-        ImageSaver().saveImage(image, File(actualDirectory, ( "$ms.jpg")))
-        imageCounter++
+    private fun saveImage(image: Image, ms: Long): Boolean {
+        var imageWasSaved = false
+        imageWasSaved = ImageSaver().saveImage(image, File(actualDirectory, ( "$ms.jpg")))
+        if(imageWasSaved) {
+            imageCounter++
+        }
+        return imageWasSaved
     }
 
     /**
@@ -462,15 +479,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     Log.e(TAG, e.toString())
                 }
                 Logger.writeToLogger(Exception().stackTrace[0], "state war STATE_PICTURE_TAKEN")
-            }
-            if(imageCounter % 100 == 0 ) {
-         //       motionPositionSensorData?.clearData() // Vor der Aufnahme werden die letzten erfassten Sensordaten(Beschl./Gier-Roll-Nick) entfernt
-          //     motionPositionSensorData?.startDataCollection()
-                try {
-           //         Thread.sleep(360)
-                } catch (e: IllegalArgumentException) {
-                   Logger.writeToLogger(Exception().stackTrace[0], e.toString())
-                }
             }
             state = STATE_TAKE_PICTURE
         } else {
@@ -562,18 +570,28 @@ class CameraFragment : Fragment(), View.OnClickListener,
     }
 
     override fun onResume() {
+        motionPositionSensorData?.clearData()
+        motionPositionSensorData?.startDataCollection()
+        startBackgroundThread()
+        try {
+            Thread.sleep(360)
+        } catch (e: IllegalArgumentException) {
+            Logger.writeToLogger(Exception().stackTrace[0], e.toString())
+        }
         Logger.writeToLogger(Exception().stackTrace[0],"")
-        super.onResume()
         if (textureView.isAvailable) {
             openCamera(textureView.width, textureView.height)
         } else {
             textureView.surfaceTextureListener = surfaceTextureListener
         }
+        super.onResume()
     }
 
     override fun onPause() {
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
             Logger.writeToLogger(Exception().stackTrace[0],"")
+        //closeCamera()
+        stopBackgroundThread()
         super.onPause()
     }
 
@@ -953,15 +971,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
             activeImageCapturing = true
             Toast.makeText(activity, "Daten werden erfasst", Toast.LENGTH_SHORT).show()
             result = true
-            if(imageCounter % 100 == 0 ) {
-               // motionPositionSensorData?.clearData() // Vor der Aufnahme werden die letzten erfassten Sensordaten(Beschl./Gier-Roll-Nick) entfernt
-                motionPositionSensorData?.startDataCollection()
-                try {
-                    Thread.sleep(360)
-                } catch (e: IllegalArgumentException) {
-                    Logger.writeToLogger(Exception().stackTrace[0], e.toString())
-                }
-            }
             state = STATE_TAKE_PICTURE
         } else {
             Toast.makeText(activity, "Daten erfassung gestoppt", Toast.LENGTH_SHORT).show()

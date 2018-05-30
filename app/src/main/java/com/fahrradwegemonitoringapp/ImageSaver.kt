@@ -11,28 +11,36 @@ import java.io.IOException
  */
 class ImageSaver {
 
-    fun saveImage(image: Image, file: File) {
-        val buffer = image.planes[0].buffer
-        val bytes = ByteArray(buffer.remaining())
-        buffer.get(bytes)
-        var output: FileOutputStream? = null
-        try {
-            output = FileOutputStream(file).apply {
-                write(bytes)
-            }
-        } catch (e: IOException) {
-            Log.e("ImageSaver", e.toString())
-        } finally {
-            image.close()
-            output?.let {
-                try {
-                    it.close()
-                } catch (e: IOException) {
-                    Log.e("ImageSaver", e.toString())
+    /**
+     * Die Methode speichert ein Bild ab
+     * Postc. Boolean == true, wenn Bild erfolgreich abgespeichert wurde
+     */
+    fun saveImage(image: Image, file: File): Boolean {
+            var imageSaved = true
+            var output: FileOutputStream? = null
+            try {
+                image.height // überprüfung ob das Bild noch existiert
+                val buffer = image.planes[0].buffer
+                val bytes = ByteArray(buffer.remaining())
+                buffer.get(bytes)
+                output = FileOutputStream(file).apply {
+                    write(bytes)
+                }
+            } catch (eI : IllegalStateException) {
+                imageSaved = false
+                Log.e("ImageSaver", eI.toString())
+            } finally {
+                image.close()
+                output?.let {
+                    try {
+                        it.close()
+                    } catch (e: IOException) {
+                        Log.e("ImageSaver", e.toString())
+                    }
                 }
             }
+        return imageSaved
         }
     }
-}
 
 

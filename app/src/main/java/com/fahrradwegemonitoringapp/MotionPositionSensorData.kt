@@ -107,6 +107,7 @@ class MotionPositionSensorData : SensorEventListener  {
      */
     fun init(activity: Activity, location: GPSLocation) {
         // Datenwerte sollen aufgerunded werden auf 5 Kommastellen
+        isDataGatheringActive = true
         val samplingPeriodMicroS = 8000
         df.roundingMode = RoundingMode.CEILING
         this.activity = activity
@@ -167,9 +168,6 @@ class MotionPositionSensorData : SensorEventListener  {
     override fun onSensorChanged(event: SensorEvent?) {
         val timeGap = SystemClock.elapsedRealtimeNanos() -  event?.timestamp!! // Berechnet Zeitdifferenz in ns zwischen Event Zeitstempel und vergangener Zeit
         val timestampNs = System.nanoTime() - timeGap
-        if(timeGap> 800000000) {
-            val ih= 'f'
-        }
         val sensorType = event.sensor?.type
         when (sensorType) {
             Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
@@ -219,7 +217,7 @@ class MotionPositionSensorData : SensorEventListener  {
      * Postc.: Gibt berechnete Daten als String zurück, wenn isDataGatheringActive ist true ansonsten null
     */
     fun getData(startExposureTime : Long, exposureTime : Long, dynamicTimeframe : Long) : String? {
-        if(exposureTime <= dynamicTimeframe) {
+        if(exposureTime <= dynamicTimeframe && timestampsNsList?.isEmpty() == false) {
             val timestampGetDataMs = time.getTime()
             val indecis = getTimeframeIndecis(timestampsNsList,startExposureTime,exposureTime, dynamicTimeframe)
             // Über die Exemplarvariablen Listen kann nicht iterriert werden, weil in einem Thread
@@ -351,12 +349,11 @@ class MotionPositionSensorData : SensorEventListener  {
     }
 
     /**
-     * Diese Methode startet die Ansammlung von Daten des linearen Beschleunigungssensors
+     * Diese Methode startet die Erfassung von Messwerten
      * Prec.:
      * Postc.: Daten werden erfasst, wenn vorher keine erfasst wurden
      */
     fun startDataCollection() {
-        if(!isDataGatheringActive)
             isDataGatheringActive = true
     }
 
@@ -392,6 +389,13 @@ class MotionPositionSensorData : SensorEventListener  {
      */
     fun getFirstTimestampSubList() : Long? {
         return firstTimeStamp
+    }
+
+    /**
+     *  Gibt True zurück, wenn timestampsNsList keine Elemente enthält
+     */
+    fun isTimestampListEmpty(): Boolean? {
+        return timestampsNsList?.isEmpty()
     }
 
     fun getFirstTimestamp() : Long? {
