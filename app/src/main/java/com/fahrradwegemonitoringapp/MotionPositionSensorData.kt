@@ -61,8 +61,6 @@ class MotionPositionSensorData : SensorEventListener  {
      */
     private var timestampsNsList: MutableList<Long>? = null
 
-    private var timestampsGap: MutableList<Long>? = null
-
     /**
      *  In diesen Variablen stehen die Kallibrierungsoffsets für
      *  Roll und Nick Winkel sowie die Beschleunigungssensorachsen Y,Z
@@ -124,7 +122,6 @@ class MotionPositionSensorData : SensorEventListener  {
         yAxisList = mutableListOf()
         zAxisList = mutableListOf()
         pitchList = mutableListOf()
-        timestampsGap = mutableListOf()
         timestampsNsList = mutableListOf()
         magnetTxt = activity.findViewById(R.id.magnetTxt) as TextView
     }
@@ -169,7 +166,10 @@ class MotionPositionSensorData : SensorEventListener  {
 
     override fun onSensorChanged(event: SensorEvent?) {
         val timeGap = SystemClock.elapsedRealtimeNanos() -  event?.timestamp!! // Berechnet Zeitdifferenz in ns zwischen Event Zeitstempel und vergangener Zeit
-        val timestampNs = time.getTimeNanoSec() - timeGap
+        val timestampNs = System.nanoTime() - timeGap
+        if(timeGap> 800000000) {
+            val ih= 'f'
+        }
         val sensorType = event.sensor?.type
         when (sensorType) {
             Sensor.TYPE_ACCELEROMETER -> mAccelerometerData = event.values.clone()
@@ -205,7 +205,6 @@ class MotionPositionSensorData : SensorEventListener  {
                 yAxisList?.add(event.values[1] - yOffset)
                 zAxisList?.add(event.values[2] - zOffset)
                 timestampsNsList?.add(timestampNs)
-                timestampsGap?.add(timeGap)
             }
         }
     }
@@ -229,14 +228,12 @@ class MotionPositionSensorData : SensorEventListener  {
             val yListFinish = yAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
             val zListFinish = zAxisList?.toMutableList()?.subList(indecis[0], indecis[1])
             val pitchListFinish = pitchList?.toMutableList()?.subList(indecis[0], indecis[1])
-            val timestampsGapFinish = timestampsGap?.toMutableList()?.subList(indecis[0], indecis[1])
             val startTimeframe = startExposureTime - calcOffsetExposure(exposureTime, dynamicTimeframe)
-            return "%s,%s,%s,%s,%s,%s,%s,%s".format(
+            return "%s,%s,%s,%s,%s,%s,%s".format(
                     calcStringList(zListFinish),
                     calcStringList(yListFinish),
                     calcStringList(pitchListFinish),
                     calcTimeStringList(timestampsFinish,exposureTime,startExposureTime,dynamicTimeframe),
-                    calcsStringListLong(timestampsGapFinish),
                     "${zListFinish?.size}",
                     "$startTimeframe",
                     "$timestampGetDataMs")
@@ -322,11 +319,11 @@ class MotionPositionSensorData : SensorEventListener  {
         firstTimeStamp  = listTime.first()
         val offsetExposure = calcOffsetExposure(exposureTime, dynamicTimeframe) // Berechnet Offset-Zeit
         val offsetExposureWorstCase = WORSTCASETIMEFRAME/2
-        val startTimeframeWorstCast = startExposureTime - offsetExposureWorstCase
+        val startTimeframeWorstCase = startExposureTime - offsetExposureWorstCase
         val startTimeframe = startExposureTime - offsetExposure
         val stopTimeframe = startExposureTime + exposureTime + offsetExposure
         listTime.forEach {
-            if (!worstCaseFound && it >= startTimeframeWorstCast) {
+            if (!worstCaseFound && it >= startTimeframeWorstCase) {
                 worstCaseFound = true
                 iWorstCase = i
             }

@@ -277,15 +277,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
         }
 
         private fun capturePicture(result: CaptureResult) {
-            if(imageCounter % 100 == 0) {
-                motionPositionSensorData?.clearData() // Vor der Aufnahme werden die letzten erfassten Sensordaten(Beschl./Gier-Roll-Nick) entfernt
-                motionPositionSensorData?.startDataCollection()
-                try {
-                    Thread.sleep(360)
-                } catch (e: IllegalArgumentException) {
-                    Logger.writeToLogger(Exception().stackTrace[0], e.toString())
-                }
-            }
             val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
             if (aeState == null || aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
                 state = STATE_PICTURE_TAKEN
@@ -370,7 +361,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         if (image != null) {
             if (location != null) {
                 speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
-               if ((speed - 5.0f) > 0.0001) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
+            //   if ((speed - 5.0f) > 0.0001) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
                 // Berechnung des dynamischen Zeitfensters
                    calcDynamicTimeframe()
                 if(stopDataCapturing()) {
@@ -392,9 +383,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 } else {
                     image.close()
                 }
-             } else {
-            image.close()
-           }
+        //     } else {
+         //   image.close()
+          // }
         } else {
             image?.close()
       }
@@ -411,14 +402,16 @@ class CameraFragment : Fragment(), View.OnClickListener,
     private fun stopDataCapturing() : Boolean {
         var exposerTimeGreaterZero = false
         // Die verstrichene Zeit muss mindestens der MAX_EXPOSURE_TIME entsprechen
-        if((System.nanoTime() - (exposureTimeStart + exposureTime)) < ((dynamicTimeframe/2) + MEASUREMENTPERIODNS)) {
+    //    if((System.nanoTime() - (exposureTimeStart + exposureTime)+(dynamicTimeframe/2)) < ((dynamicTimeframe) + MEASUREMENTPERIODNS)) {
             // Ausreichend Zeit für die Bewegungssensordatenerfassung gewährleisten
+
+
             try {
-                Thread.sleep(( ((dynamicTimeframe/2)+MEASUREMENTPERIODNS) - (System.nanoTime() - (exposureTimeStart + exposureTime)))/1000000)
+                Thread.sleep(40000)//( ((dynamicTimeframe*2)+MEASUREMENTPERIODNS) - (System.nanoTime() - (exposureTimeStart + exposureTime)))/1000000)
             } catch (e: IllegalArgumentException) {
                 Logger.writeToLogger(Exception().stackTrace[0],e.toString())
             }
-        }
+      //  }
         if(exposureTime > 0) {
             exposerTimeGreaterZero =  true
         }
@@ -461,7 +454,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         exposureTime = 0
         if(buttonCaptureRequestActive) {
             if(state == STATE_PICTURE_TAKEN) { // Nach der Aufnahme eines einzelnen Bildes muss sichergestellt werden, dass
-                try {                          // wieder Konitnuirlich Bilder Aufgenommen werden
+                try {                          // wieder Kontinuirlich Bilder Aufgenommen werden
                     captureSession?.setRepeatingRequest(previewRequest, captureCallback,
                             backgroundHandler)
                 } catch (e: CameraAccessException) {
@@ -469,6 +462,15 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     Log.e(TAG, e.toString())
                 }
                 Logger.writeToLogger(Exception().stackTrace[0], "state war STATE_PICTURE_TAKEN")
+            }
+            if(imageCounter % 100 == 0 ) {
+         //       motionPositionSensorData?.clearData() // Vor der Aufnahme werden die letzten erfassten Sensordaten(Beschl./Gier-Roll-Nick) entfernt
+          //     motionPositionSensorData?.startDataCollection()
+                try {
+           //         Thread.sleep(360)
+                } catch (e: IllegalArgumentException) {
+                   Logger.writeToLogger(Exception().stackTrace[0], e.toString())
+                }
             }
             state = STATE_TAKE_PICTURE
         } else {
@@ -507,9 +509,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("merkmaleRoh.csv"))
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
                 "Zeitstempel in Unixzeit","Breitengrad","Laengengrad","Geschwindigkeit in km/h","Z-Achse Beschleunigungswerte in m/s^2","Y-Achse Beschleunigungswerte in m/s^2",
-                "Nick Messwerte in rad","Zeitstempel der Messwerte in ns","Sensor Events Zeitstempel Zeitdifferenz in ns seit hochfahren des Smarphone","Anzahl der Messwerte","Start des Zeitfensters in ns seit Start der JVM","Zeitstempel Messwertdaten anfordern in Unixzeit",
+                "Nick Messwerte in rad","Zeitstempel der Messwerte in ns","Anzahl der Messwerte","Start des Zeitfensters in ns seit Start der JVM","Zeitstempel Messwertdaten anfordern in Unixzeit",
                 "Start der Messwerterfassung in ns seit Start der JVM","Erster Zeitstempel der Teilliste in ns seit Start der JVM","Start der Belichtung in ns seit Start der JVM","Belichtungszeit in ns",
                 "Letzter Zeitstempel der Messwerterfassung in ns seit Start der JVM","Speicherzeitpunkt der Merkmale in Unixzeit"))
     }
@@ -562,7 +564,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
     override fun onResume() {
         Logger.writeToLogger(Exception().stackTrace[0],"")
         super.onResume()
-        startBackgroundThread()
         if (textureView.isAvailable) {
             openCamera(textureView.width, textureView.height)
         } else {
@@ -573,10 +574,9 @@ class CameraFragment : Fragment(), View.OnClickListener,
     override fun onPause() {
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
             Logger.writeToLogger(Exception().stackTrace[0],"")
-        closeCamera()
-        stopBackgroundThread()
         super.onPause()
     }
+
 
     /**
      * Mit dieser Methode werden mehere Anfragen an den Nutzer gestellt, wenn die jeweilige Erlaubnis nicht gegeben ist,
@@ -953,6 +953,15 @@ class CameraFragment : Fragment(), View.OnClickListener,
             activeImageCapturing = true
             Toast.makeText(activity, "Daten werden erfasst", Toast.LENGTH_SHORT).show()
             result = true
+            if(imageCounter % 100 == 0 ) {
+               // motionPositionSensorData?.clearData() // Vor der Aufnahme werden die letzten erfassten Sensordaten(Beschl./Gier-Roll-Nick) entfernt
+                motionPositionSensorData?.startDataCollection()
+                try {
+                    Thread.sleep(360)
+                } catch (e: IllegalArgumentException) {
+                    Logger.writeToLogger(Exception().stackTrace[0], e.toString())
+                }
+            }
             state = STATE_TAKE_PICTURE
         } else {
             Toast.makeText(activity, "Daten erfassung gestoppt", Toast.LENGTH_SHORT).show()
