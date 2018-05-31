@@ -415,11 +415,13 @@ class CameraFragment : Fragment(), View.OnClickListener,
      */
     private fun stopDataCapturing() : Boolean {
         var exposerTimeGreaterZero = false
+        val waitingTime : Long
         // Die verstrichene Zeit muss mindestens der MAX_EXPOSURE_TIME entsprechen
-        if((System.nanoTime() - (exposureTimeStart + exposureTime)) < ((dynamicTimeframe/2) + MEASUREMENTPERIODNS)) {
+        if((System.nanoTime() - exposureTimeStart) < ((((dynamicTimeframe-exposureTime)/2) + exposureTime))) {
             // Ausreichend Zeit für die Bewegungssensordatenerfassung gewährleisten
             try {
-                Thread.sleep(( ((dynamicTimeframe*2)+MEASUREMENTPERIODNS) - (System.nanoTime() - (exposureTimeStart + exposureTime)))/1000000)
+                waitingTime = ((((dynamicTimeframe-exposureTime)/2) + exposureTime) - (System.nanoTime() - exposureTimeStart))/1000000
+                Thread.sleep(Math.abs(waitingTime))
             } catch (e: IllegalArgumentException) {
                 Logger.writeToLogger(Exception().stackTrace[0],e.toString())
             }
@@ -436,8 +438,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Post.: Bild ist abgespeichert. Boolean == True, wenn Bild abgespeichert wurde
      */
     private fun saveImage(image: Image, ms: Long): Boolean {
-        var imageWasSaved = false
-        imageWasSaved = ImageSaver().saveImage(image, File(actualDirectory, ( "$ms.jpg")))
+        val imageWasSaved = ImageSaver().saveImage(image, File(actualDirectory, ( "$ms.jpg")))
         if(imageWasSaved) {
             imageCounter++
         }
@@ -590,7 +591,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     override fun onPause() {
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
             Logger.writeToLogger(Exception().stackTrace[0],"")
-        //closeCamera()
+        closeCamera()
         stopBackgroundThread()
         super.onPause()
     }
