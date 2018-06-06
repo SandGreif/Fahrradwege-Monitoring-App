@@ -19,6 +19,7 @@
 package com.fahrradwegemonitoringapp
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.DialogInterface
 import android.content.pm.PackageManager
@@ -57,6 +58,7 @@ import java.util.Collections.max
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlin.collections.ArrayList
+import kotlin.math.PI
 
 class CameraFragment : Fragment(), View.OnClickListener,
         ActivityCompat.OnRequestPermissionsResultCallback {
@@ -84,6 +86,11 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Um die aktuelle Geschwindigkeit für den Nutzer sichtbar zu machen
      */
     private lateinit var speedTxt : TextView
+
+    /**
+     * Um den aktuellen Nick-Winkel dem Nutzer sichtbar zu machen
+     */
+    private lateinit var pitchTxt : TextView
 
     /**
      * Um die Anzahl der aufgenommenen Bilder für den Nutzer sichtbar zu machen
@@ -187,7 +194,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     /**
      * Um Datenwerte aufzurunden auf 2 Kommastellen
      */
-    private var  df = DecimalFormat("#.#####")
+    private var  df = DecimalFormat("#.##")
 
     /**
      * Wurzelverzeichnis um Dateien abzuspeichern
@@ -304,11 +311,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
         override fun onCaptureCompleted(session: CameraCaptureSession,
                                         request: CaptureRequest,
                                         result: TotalCaptureResult) {
-            if(gpsLocation?.getLocation() != null) { // Geschwindigkeit auf dem UI ausgeben
+            if(gpsLocation?.getLocation() != null)  { // Geschwindigkeit auf dem UI ausgeben
                 val speedOnComplete = (gpsLocation!!.getLocation()?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
                 activity.runOnUiThread({
                     run {
                         speedTxt.text = "%s %s".format(df.format(speedOnComplete), " km/h")
+                        pitchTxt.text = "%s %s".format(df.format(motionPositionSensorData?.getLastPitchValue()!! *(180 / PI.toFloat())), "Nick-Winkel Grad")
                     }
                 })
             }
@@ -452,12 +460,13 @@ class CameraFragment : Fragment(), View.OnClickListener,
      * Prec.:  timestamp > 0
      * Postc.: Merkmale wurden in eine Datei geschrieben
      */
+    @SuppressLint("NewApi")
     private fun saveFeatures(timestamp : Long) {
         val latitude = location?.latitude?.toFloat()
         val longitude = location?.longitude?.toFloat()
         val motionDataString = motionPositionSensorData?.getData(exposureTimeStart,exposureTime,dynamicTimeframe)
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
-                "$timestamp","$latitude","$longitude","$speed","$motionDataString","${motionPositionSensorData?.getFirstTimestamp()}",
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+                "$timestamp","$latitude","$longitude","$speed","${location?.speedAccuracyMetersPerSecond}","${location?.time}","$motionDataString","${motionPositionSensorData?.getFirstTimestamp()}",
                 "${motionPositionSensorData?.getFirstTimestampSubList()}",
                 "$exposureTimeStart","$exposureTime","${motionPositionSensorData?.getLastTimestamp()}",
                 "${time.getTime()}"))
@@ -518,8 +527,8 @@ class CameraFragment : Fragment(), View.OnClickListener,
         actualDirectory = File(letDirectory, "$directoriesCounter")
         actualDirectory.mkdir()
         fileLocation = File(actualDirectory, ("merkmaleRoh.csv"))
-        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
-                "Zeitstempel in Unixzeit","Breitengrad","Laengengrad","Geschwindigkeit in km/h","Z-Achse Beschleunigungswerte in m/s^2","Y-Achse Beschleunigungswerte in m/s^2",
+        fileLocation.appendText("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n".format(
+                "Zeitstempel in Unixzeit","Breitengrad","Laengengrad","Geschwindigkeit in km/h","Genauigkeit der Geschwindigkeit speedAccuracyMetersPerSecond","Lokations Zeitstempel in Unixzeit","Z-Achse Beschleunigungswerte in m/s^2","Y-Achse Beschleunigungswerte in m/s^2",
                 "Nick Messwerte in rad","Zeitstempel der Messwerte in ns","Anzahl der Messwerte","Start des Zeitfensters in ns seit Start der JVM","Zeitstempel Messwertdaten anfordern in Unixzeit",
                 "Start der Messwerterfassung in ns seit Start der JVM","Erster Zeitstempel der Teilliste in ns seit Start der JVM","Start der Belichtung in ns seit Start der JVM","Belichtungszeit in ns",
                 "Letzter Zeitstempel der Messwerterfassung in ns seit Start der JVM","Speicherzeitpunkt der Merkmale in Unixzeit"))
@@ -534,6 +543,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         textureView = view.findViewById(R.id.texture)
         imageCounterTxt = view.findViewById(R.id.imageCounterTxt) as TextView
         speedTxt = view.findViewById(R.id.speedTxt) as TextView
+        pitchTxt = view.findViewById(R.id.pitchTxt) as TextView
         val toggleButton = view.findViewById(R.id.toggleButtonStart) as ToggleButton
         val toggleButtonCalibration = view.findViewById(R.id.toggleButtonCalibration) as ToggleButton
         toggleButton.setOnCheckedChangeListener { _, isChecked ->
@@ -574,15 +584,17 @@ class CameraFragment : Fragment(), View.OnClickListener,
         motionPositionSensorData?.clearData()
         motionPositionSensorData?.startDataCollection()
         startBackgroundThread()
+        Logger.writeToLogger(Exception().stackTrace[0], "Nach den Starten des Backgroundthread")
         try {
             Thread.sleep(360)
         } catch (e: IllegalArgumentException) {
             Logger.writeToLogger(Exception().stackTrace[0], e.toString())
         }
-        Logger.writeToLogger(Exception().stackTrace[0],"")
         if (textureView.isAvailable) {
+            Logger.writeToLogger(Exception().stackTrace[0], "Vor den Öffnen der Kamera Klasse")
             openCamera(textureView.width, textureView.height)
         } else {
+            Logger.writeToLogger(Exception().stackTrace[0], "textureView ist nicht verfügbar")
             textureView.surfaceTextureListener = surfaceTextureListener
         }
         super.onResume()
@@ -679,6 +691,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     continue
                 }
                 fpsRange = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
+                val exposureRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
                 val map = characteristics.get(
                         CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: continue
                 val largest = max(
@@ -892,7 +905,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
             }
             var frameNumberStart : Long = 0
             val rotation = activity.windowManager.defaultDisplay.rotation
-
             val captureBuilder = cameraDevice?.createCaptureRequest(
                     CameraDevice.TEMPLATE_STILL_CAPTURE)?.apply {// Block an Anweisungen
                 addTarget(imageReader?.surface) // Zum abspeichern wird das Bild an den ImageReader Handler geschickt

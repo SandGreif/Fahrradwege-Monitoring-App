@@ -392,6 +392,18 @@ class MotionPositionSensorData : SensorEventListener  {
     }
 
     /**
+     * Gibt den letzen erfassten Nick-Winkel zurück
+     * return Nick Winkel oder -1, wenn Liste null ist
+     */
+    fun getLastPitchValue() : Float {
+        if(pitchList != null)
+            return pitchList!!.last()
+        else {
+            return -1.0f
+        }
+    }
+
+    /**
      *  Gibt True zurück, wenn timestampsNsList keine Elemente enthält
      */
     fun isTimestampListEmpty(): Boolean? {

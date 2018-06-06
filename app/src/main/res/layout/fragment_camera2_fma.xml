@@ -71,6 +71,18 @@
         android:textColor="?android:attr/colorBackground"
         android:textSize="24sp" />
 
+    <TextView
+        android:id="@+id/pitchTxt"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/control"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="1dp"
+        android:fontFamily="sans-serif-condensed"
+        android:text="@string/imageCounterTxt"
+        android:textColor="?android:attr/colorBackground"
+        android:textSize="24sp" />
+
     <ToggleButton
         android:id="@+id/toggleButtonStart"
         style="@android:style/Widget.Button.Toggle"
