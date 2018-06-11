@@ -66,7 +66,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     /**
      * Länge des dynamischen Zeitfensters in Nanosekunden
      */
-    private  var dynamicTimeframe: Long = 0
+    private  var dynamicTimeframe: Long = WORSTCASETIMEFRAME
     /**
      * ID der Kamera [CameraDevice].
      */
@@ -290,7 +290,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     motionPositionSensorData?.clearData() // Vor der Aufnahme werden die letzten erfassten Sensordaten(Beschl./Gier-Roll-Nick) entfernt
                     motionPositionSensorData?.startDataCollection()
                     try {
-                        Thread.sleep(360)
+                        Thread.sleep(250)
                     } catch (e: IllegalArgumentException) {
                         Logger.writeToLogger(Exception().stackTrace[0], e.toString())
                     }
@@ -380,7 +380,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
                if ((speed - 5.0f) > 0.0001) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
                 // Berechnung des dynamischen Zeitfensters
-                   calcDynamicTimeframe()
+                //   calcDynamicTimeframe()
                 if(stopDataCapturing()) {
                         if (imageCounter % (2000 * directoriesCounter) == 0) {
                             newFolder()
@@ -586,7 +586,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
         startBackgroundThread()
         Logger.writeToLogger(Exception().stackTrace[0], "Nach den Starten des Backgroundthread")
         try {
-            Thread.sleep(360)
+            Thread.sleep(250)
         } catch (e: IllegalArgumentException) {
             Logger.writeToLogger(Exception().stackTrace[0], e.toString())
         }
@@ -691,7 +691,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     continue
                 }
                 fpsRange = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
-                val exposureRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
+             //   val exposureRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
                 val map = characteristics.get(
                         CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: continue
                 val largest = max(
