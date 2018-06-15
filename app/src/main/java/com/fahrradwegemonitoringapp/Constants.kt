@@ -26,4 +26,4 @@ package com.fahrradwegemonitoringapp
 const val REQUEST_MULTIPLE_PERMISSIONS = 1
 
 // Dauer des längsten möglichen Zeitfensters in ns
-const val WORSTCASETIMEFRAME : Long = 500000000
+const val WORSTCASETIMEFRAME : Long = 720000000

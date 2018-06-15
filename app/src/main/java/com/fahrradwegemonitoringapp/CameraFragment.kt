@@ -66,7 +66,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
     /**
      * Länge des dynamischen Zeitfensters in Nanosekunden
      */
-    private  var dynamicTimeframe: Long = WORSTCASETIMEFRAME
+    private  var dynamicTimeframe: Long = 0
     /**
      * ID der Kamera [CameraDevice].
      */
@@ -380,7 +380,7 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 speed = (location?.speed!! * 60 * 60) / 1000 // Umrechnung von m/s in km/h
                if ((speed - 5.0f) > 0.0001) {  // Geschwindigkeit muss zwischen 5-25km/h liegen
                 // Berechnung des dynamischen Zeitfensters
-                //   calcDynamicTimeframe()
+                calcDynamicTimeframe()
                 if(stopDataCapturing()) {
                         if (imageCounter % (2000 * directoriesCounter) == 0) {
                             newFolder()
