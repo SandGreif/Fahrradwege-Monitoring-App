@@ -269,14 +269,12 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     if (aeState == null || aeState == CaptureResult.CONTROL_AE_STATE_PRECAPTURE
                     || aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
                         state = STATE_WAITING_NON_PRECAPTURE
-                        Logger.writeToLogger(Exception().stackTrace[0],"STATE_WAITING_NON_PRECAPTURE")
                     }
                 }
                 STATE_WAITING_NON_PRECAPTURE -> {
                     val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
                     if (aeState == null || aeState != CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
                         state = STATE_PICTURE_TAKEN
-                        Logger.writeToLogger(Exception().stackTrace[0],"STATE_PICTURE_TAKEN")
                         captureStillPicture()
                     }
                 }
@@ -470,7 +468,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
                 "${motionPositionSensorData?.getFirstTimestampSubList()}",
                 "$exposureTimeStart","$exposureTime","${motionPositionSensorData?.getLastTimestamp()}",
                 "${time.getTime()}"))
-        Logger.writeToLogger(Exception().stackTrace[0],"saveFeatures")
     }
 
     /**
@@ -488,7 +485,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     Logger.writeToLogger(Exception().stackTrace[0], e.toString())
                     Log.e(TAG, e.toString())
                 }
-                Logger.writeToLogger(Exception().stackTrace[0], "state war STATE_PICTURE_TAKEN")
             }
             state = STATE_TAKE_PICTURE
         } else {
@@ -942,7 +938,6 @@ class CameraFragment : Fragment(), View.OnClickListener,
                     if(result.frameNumber == frameNumberStart) { // Nur wenn die Frame Nummern übereinstimmen ist dies das einzelne angefragte Bild
                         exposureTime = result.get(CaptureResult.SENSOR_EXPOSURE_TIME)
                         // Nach der Aufnahme wird der Kamera Zustand auf preview gesetzt
-                        Logger.writeToLogger(Exception().stackTrace[0],"onCaptureCompleted")
                         setRepeatingPreviewRequest()
                     }
                 }
