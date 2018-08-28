@@ -133,27 +133,27 @@ class MotionPositionSensorData : SensorEventListener  {
                 when (accuracy) {
                 // Genauigkeit ist Unzuverlaessig
                     0 -> {
-                        activity?.runOnUiThread({
+                        activity?.runOnUiThread {
                             run {
                                 magnetTxt.text = "%s".format("Magnetsensorgenauigkeit: unzuverlässig")
                             }
-                        })
+                        }
                         Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensorgenauigkeit: SENSOR_STATUS_UNRELIABLE\n")
                     }
                     1 -> {
-                        activity?.runOnUiThread({
+                        activity?.runOnUiThread {
                             run {
                                 magnetTxt.text = "%s".format("Magnetsensorgenauigkeit: niedrig")
                             }
-                        })
+                        }
                         Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensorgenauigkeit: SENSOR_STATUS_ACCURACY_LOW\n")
                     }
                     2 -> {
-                        activity?.runOnUiThread({
+                        activity?.runOnUiThread {
                             run {
                                 magnetTxt.text = "%s".format("Magnetsensorgenauigkeit: mittel")
                             }
-                        })
+                        }
                         Logger.writeToLogger(Exception().stackTrace[0], "Magnetsensorgenauigkeit: SENSOR_STATUS_ACCURACY_MEDIUM\n")
                     }
                     3 -> {
